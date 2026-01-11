@@ -3,8 +3,12 @@
  * GET /embed/{id}
  * 
  * Serves the embed page with the appropriate media player.
- * - Videos: Plyr.io player
- * - Images: Responsive img tag
+ * - Videos: Plyr.io player with modern controls
+ * - Images: Responsive img tag centered on black background
+ * 
+ * Supports both:
+ * - Public buckets: Direct URL to B2 (no signing needed)
+ * - Private buckets: Signed URLs with configurable expiry
  * 
  * The page is designed to be embedded in iframes.
  */
@@ -33,23 +37,33 @@ export async function onRequestGet(context) {
         
         const metadata = JSON.parse(data);
         
-        // Generate signed URL for the media file
-        const signedUrl = await generatePresignedGetUrl({
-            bucket: env.B2_BUCKET,
-            key: metadata.b2Key,
-            accessKeyId: env.B2_KEY_ID,
-            secretAccessKey: env.B2_APP_KEY,
-            region: env.B2_REGION,
-            endpoint: env.B2_ENDPOINT,
-            expiresIn: 3600 // 1 hour for embed pages
-        });
+        // Determine media URL based on bucket type
+        let mediaUrl;
+        
+        if (env.B2_PUBLIC_URL) {
+            // Public bucket: Use direct URL (no signing needed)
+            // Format: https://f004.backblazeb2.com/file/bucket-name/path/to/file.mp4
+            mediaUrl = `${env.B2_PUBLIC_URL}/${metadata.b2Key}`;
+        } else {
+            // Private bucket: Generate signed URL
+            // Default to 6 hour expiry for embeds (balances security and usability)
+            mediaUrl = await generatePresignedGetUrl({
+                bucket: env.B2_BUCKET,
+                key: metadata.b2Key,
+                accessKeyId: env.B2_KEY_ID,
+                secretAccessKey: env.B2_APP_KEY,
+                region: env.B2_REGION,
+                endpoint: env.B2_ENDPOINT,
+                expiresIn: 21600 // 6 hours for embed pages
+            });
+        }
         
         const isVideo = metadata.contentType.startsWith('video/');
         
         // Generate the appropriate embed page
         const html = isVideo 
-            ? videoEmbedPage(signedUrl, metadata)
-            : imageEmbedPage(signedUrl, metadata);
+            ? videoEmbedPage(mediaUrl, metadata)
+            : imageEmbedPage(mediaUrl, metadata);
         
         return new Response(html, {
             status: 200,
@@ -57,7 +71,8 @@ export async function onRequestGet(context) {
                 'Content-Type': 'text/html',
                 // Allow embedding from any origin
                 'X-Frame-Options': 'ALLOWALL',
-                // Cache for 5 minutes (URL will still work due to 1 hour expiry)
+                'Content-Security-Policy': "frame-ancestors *;",
+                // Cache the HTML page for 5 minutes (URL will still work due to longer expiry)
                 'Cache-Control': 'public, max-age=300'
             }
         });

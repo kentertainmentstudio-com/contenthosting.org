@@ -1,59 +1,77 @@
 # ContentHosting.org
 
-A minimal, private video and image embed generator using Cloudflare Pages + Backblaze B2.
+Self-hosted video and image embed generator using Cloudflare Pages + Backblaze B2.
 
-## Quick Start
+Upload media files → Get permanent embed URLs → Paste anywhere.
 
-1. **Clone and install:**
-   ```bash
-   git clone https://github.com/your-username/contenthosting.org.git
-   cd contenthosting.org
-   npm install
-   ```
+## ✨ Features
 
-2. **Set up credentials (see [SETUP.md](SETUP.md)):**
-   - Create Backblaze B2 bucket
-   - Create Workers KV namespace
-   - Configure environment variables
+- 🔐 **Password-protected admin panel** at `/admin`
+- 📤 **Direct uploads to B2** (bypasses Cloudflare's 100MB limit)
+- 🎬 **Plyr.io video player** with modern controls
+- 🔗 **Permanent embed URLs** that don't expire
+- 📋 **One-click copy** for embed URL and iframe code
+- 🗑️ **File management** with delete functionality
+- 🆓 **Zero cost** with Cloudflare + B2 free tiers
 
-3. **Local development:**
-   ```bash
-   # Copy example env file
-   cp .dev.vars.example .dev.vars
-   # Edit .dev.vars with your credentials
-   
-   # Start dev server
-   npm run dev
-   ```
+## 🚀 Quick Start
 
-4. **Deploy:**
-   ```bash
-   npm run deploy
-   ```
+### 1. Clone and Install
 
-## Documentation
+```bash
+git clone https://github.com/your-username/contenthosting.org.git
+cd contenthosting.org
+npm install
+```
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) - System overview and diagrams
-- [SETUP.md](SETUP.md) - Detailed setup instructions
+### 2. Set Up Services
 
-## Features
+- Create a [Backblaze B2](https://www.backblaze.com/b2/) bucket
+- Create a [Cloudflare KV](https://developers.cloudflare.com/workers/runtime-apis/kv/) namespace
+- See [SETUP.md](SETUP.md) for detailed instructions
 
-- ✅ Password-protected admin panel
-- ✅ Direct browser-to-B2 uploads (bypasses Worker limits)
-- ✅ Plyr.io video player
-- ✅ Signed URLs for security
-- ✅ Copy-to-clipboard embed codes
-- ✅ Zero external servers (Cloudflare + B2 only)
+### 3. Configure Environment
 
-## Usage
+```bash
+# Copy example env file
+cp .dev.vars.example .dev.vars
 
-1. Go to `https://contenthosting.org/admin`
+# Generate password hash
+npm run hash-password
+
+# Edit .dev.vars with your credentials
+```
+
+### 4. Run Locally
+
+```bash
+npm run dev
+# Open http://localhost:8788/admin
+```
+
+### 5. Deploy
+
+```bash
+npm run deploy
+# Or push to GitHub if connected to Cloudflare Pages
+```
+
+## 📖 Documentation
+
+| File | Description |
+|------|-------------|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | System overview, diagrams, data flow |
+| [SETUP.md](SETUP.md) | Step-by-step setup instructions |
+
+## 🎯 Usage
+
+1. Visit `https://contenthosting.org/admin`
 2. Login with your password
-3. Upload video or image
-4. Click "Embed" to copy iframe code
+3. Upload video (MP4, WebM) or image (JPG, PNG, GIF)
+4. Copy the embed URL or iframe code
 5. Paste into your website
 
-## Embed Example
+## 📺 Embed Example
 
 ```html
 <iframe 
@@ -65,14 +83,16 @@ A minimal, private video and image embed generator using Cloudflare Pages + Back
 </iframe>
 ```
 
-## Security
+## 🔒 Security
 
-- Admin access via SHA-256 password hash
-- Files served via time-limited signed URLs
-- Media subdomain uses DNS-only (grey cloud) for ToS compliance
-- Session tokens expire after 24 hours
+| Feature | Implementation |
+|---------|----------------|
+| Admin auth | SHA-256 password hash |
+| Sessions | Random tokens with 24h TTL in KV |
+| File access | Signed URLs (private) or direct (public) |
+| Media delivery | DNS-only mode for ToS compliance |
 
-## Cost (Free Tier)
+## 💰 Cost (Free Tiers)
 
 | Service | Free Allowance |
 |---------|----------------|

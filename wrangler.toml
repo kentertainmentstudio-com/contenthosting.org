@@ -1,7 +1,7 @@
 # ContentHosting.org - Wrangler Configuration
 # 
 # This file configures Cloudflare Pages and Workers.
-# Copy this to your project root and update the values.
+# Update the KV namespace ID and deploy.
 
 name = "contenthosting"
 compatibility_date = "2024-01-01"
@@ -9,27 +9,52 @@ compatibility_date = "2024-01-01"
 # Pages configuration
 pages_build_output_dir = "public"
 
-# KV Namespace binding
-# Replace with your actual namespace ID from Cloudflare dashboard
-# [[kv_namespaces]]
-# binding = "CONTENT_KV"
-# id = "your-kv-namespace-id-here"
+# ============================================
+# KV Namespace Binding
+# ============================================
+# REQUIRED: Replace with your actual namespace ID from Cloudflare dashboard
+# Go to: Workers & Pages → KV → Create namespace → Copy ID
 
-# For local development, you can use a preview namespace
-# [[kv_namespaces]]
-# binding = "CONTENT_KV"
-# id = "your-kv-namespace-id-here"
-# preview_id = "your-preview-namespace-id-here"
+[[kv_namespaces]]
+binding = "CONTENT_KV"
+id = "YOUR_KV_NAMESPACE_ID_HERE"
 
-# Environment variables (set these in Cloudflare Dashboard for production)
-# These are example placeholders - DO NOT commit real credentials
-# 
-# [vars]
-# B2_BUCKET = "contenthosting-media"
-# B2_REGION = "us-west-004"
-# B2_ENDPOINT = "s3.us-west-004.backblazeb2.com"
-# 
-# Secrets (set via `wrangler secret put` or Cloudflare Dashboard):
-# - ADMIN_PASSWORD_HASH
-# - B2_KEY_ID
-# - B2_APP_KEY
+# ============================================
+# Environment Variables (Non-Secret)
+# ============================================
+# Set these in Cloudflare Dashboard for production
+# These are example values - update for your setup
+
+[vars]
+B2_BUCKET = "contenthosting-media"
+B2_REGION = "us-west-004"
+B2_ENDPOINT = "s3.us-west-004.backblazeb2.com"
+
+# ============================================
+# Secrets (NEVER put real values here)
+# ============================================
+# Set these via Cloudflare Dashboard → Settings → Environment variables
+# Or use: wrangler secret put <SECRET_NAME>
+#
+# Required secrets:
+#   - ADMIN_PASSWORD_HASH  (SHA-256 hash of admin password)
+#   - B2_KEY_ID            (Backblaze B2 key ID)
+#   - B2_APP_KEY           (Backblaze B2 application key)
+#
+# Example commands:
+#   wrangler secret put ADMIN_PASSWORD_HASH
+#   wrangler secret put B2_KEY_ID
+#   wrangler secret put B2_APP_KEY
+
+# ============================================
+# Local Development
+# ============================================
+# For local dev, create .dev.vars file with:
+#
+# ADMIN_PASSWORD_HASH=your_sha256_hash
+# B2_KEY_ID=your_key_id
+# B2_APP_KEY=your_app_key
+# B2_BUCKET=contenthosting-media
+# B2_REGION=us-west-004
+# B2_ENDPOINT=s3.us-west-004.backblazeb2.com
+

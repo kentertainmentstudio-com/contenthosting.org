@@ -15,6 +15,14 @@
         .file-list::-webkit-scrollbar { width: 8px; }
         .file-list::-webkit-scrollbar-track { background: #1e293b; }
         .file-list::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        /* Upload progress bar */
+        .progress-bar { transition: width 0.3s ease; }
+        /* Preview modal */
+        .modal-backdrop { backdrop-filter: blur(4px); }
+        /* File preview styles */
+        .preview-container { max-height: 200px; overflow: hidden; }
+        .preview-video { max-height: 200px; }
+        .preview-image { max-height: 200px; max-width: 100%; object-fit: contain; }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen">
@@ -65,6 +73,7 @@
             <h2 class="text-lg font-semibold mb-4">Upload New File</h2>
             
             <form id="upload-form" class="space-y-4">
+                <!-- File Input with Preview -->
                 <div>
                     <label class="block text-sm font-medium mb-2">Select File</label>
                     <input 
@@ -74,7 +83,21 @@
                         class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white file:cursor-pointer cursor-pointer"
                         required
                     >
-                    <p class="text-slate-400 text-xs mt-1">Supported: MP4, WebM, JPG, PNG, GIF</p>
+                    <p class="text-slate-400 text-xs mt-1">Supported: MP4, WebM, JPG, PNG, GIF (max 500MB)</p>
+                </div>
+                
+                <!-- File Preview Area -->
+                <div id="file-preview" class="hidden preview-container bg-slate-700 rounded-lg p-4">
+                    <div id="preview-content" class="flex items-center justify-center"></div>
+                    <div id="file-info" class="mt-2 text-sm text-slate-400"></div>
+                </div>
+                
+                <!-- Progress Bar -->
+                <div id="progress-container" class="hidden">
+                    <div class="w-full bg-slate-700 rounded-full h-2">
+                        <div id="progress-bar" class="progress-bar bg-blue-600 h-2 rounded-full" style="width: 0%"></div>
+                    </div>
+                    <p id="upload-status" class="text-sm text-slate-400 mt-2">Preparing upload...</p>
                 </div>
                 
                 <div class="flex gap-4">
@@ -85,10 +108,6 @@
                     >
                         Upload
                     </button>
-                    <div id="upload-progress" class="hidden flex items-center gap-2">
-                        <div class="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                        <span id="upload-status" class="text-sm text-slate-400">Uploading...</span>
-                    </div>
                 </div>
             </form>
             
@@ -130,7 +149,7 @@
         <!-- File List Section -->
         <div class="bg-slate-800 rounded-lg p-6">
             <div class="flex justify-between items-center mb-4">
-                <h2 class="text-lg font-semibold">Uploaded Files</h2>
+                <h2 class="text-lg font-semibold">Uploaded Files (<span id="file-count">0</span>)</h2>
                 <button 
                     id="refresh-btn"
                     onclick="loadFileList()"
@@ -143,8 +162,25 @@
                 </button>
             </div>
             
-            <div id="file-list" class="file-list space-y-2 max-h-96 overflow-y-auto">
+            <div id="file-list" class="file-list space-y-2 max-h-[500px] overflow-y-auto">
                 <p class="text-slate-400 text-center py-4">Loading files...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div id="preview-modal" class="fixed inset-0 bg-black/80 modal-backdrop hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <div class="flex justify-between items-center p-4 border-b border-slate-700">
+                <h3 id="modal-title" class="font-medium truncate">Preview</h3>
+                <button onclick="closePreviewModal()" class="text-slate-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div id="modal-content" class="p-4 flex items-center justify-center bg-black min-h-[300px]">
+                <!-- Content loaded dynamically -->
             </div>
         </div>
     </div>
@@ -165,6 +201,7 @@
         // State Management
         // ============================================
         let authToken = localStorage.getItem('auth_token');
+        let selectedFile = null;
         
         // ============================================
         // DOM Elements
@@ -176,11 +213,16 @@
         const uploadForm = document.getElementById('upload-form');
         const fileInput = document.getElementById('file-input');
         const uploadBtn = document.getElementById('upload-btn');
-        const uploadProgress = document.getElementById('upload-progress');
+        const progressContainer = document.getElementById('progress-container');
+        const progressBar = document.getElementById('progress-bar');
         const uploadStatus = document.getElementById('upload-status');
         const uploadResult = document.getElementById('upload-result');
         const fileList = document.getElementById('file-list');
+        const fileCount = document.getElementById('file-count');
         const logoutBtn = document.getElementById('logout-btn');
+        const filePreview = document.getElementById('file-preview');
+        const previewContent = document.getElementById('preview-content');
+        const fileInfo = document.getElementById('file-info');
         
         // ============================================
         // Authentication
@@ -198,6 +240,435 @@
             
             try {
                 const response = await fetch(`${API_BASE}/auth`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    authToken = data.token;
+                    localStorage.setItem('auth_token', authToken);
+                    loginError.classList.add('hidden');
+                    showAdminPanel();
+                } else {
+                    loginError.classList.remove('hidden');
+                }
+            } catch (err) {
+                console.error('Login error:', err);
+                loginError.textContent = 'Connection error. Please try again.';
+                loginError.classList.remove('hidden');
+            }
+        });
+        
+        // Logout handler
+        logoutBtn.addEventListener('click', () => {
+            localStorage.removeItem('auth_token');
+            authToken = null;
+            loginScreen.classList.remove('hidden');
+            adminPanel.classList.add('hidden');
+        });
+        
+        function showAdminPanel() {
+            loginScreen.classList.add('hidden');
+            adminPanel.classList.remove('hidden');
+            loadFileList();
+        }
+        
+        // ============================================
+        // File Preview
+        // ============================================
+        
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) {
+                filePreview.classList.add('hidden');
+                selectedFile = null;
+                return;
+            }
+            
+            selectedFile = file;
+            const isVideo = file.type.startsWith('video/');
+            const isImage = file.type.startsWith('image/');
+            
+            // Show file info
+            fileInfo.textContent = `${file.name} • ${formatFileSize(file.size)}`;
+            
+            // Generate preview
+            previewContent.innerHTML = '';
+            
+            if (isImage) {
+                const img = document.createElement('img');
+                img.src = URL.createObjectURL(file);
+                img.className = 'preview-image rounded';
+                img.onload = () => URL.revokeObjectURL(img.src);
+                previewContent.appendChild(img);
+            } else if (isVideo) {
+                const video = document.createElement('video');
+                video.src = URL.createObjectURL(file);
+                video.className = 'preview-video rounded';
+                video.controls = true;
+                video.muted = true;
+                video.onloadeddata = () => URL.revokeObjectURL(video.src);
+                previewContent.appendChild(video);
+            }
+            
+            filePreview.classList.remove('hidden');
+        });
+        
+        // ============================================
+        // File Upload with Progress
+        // ============================================
+        
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const file = fileInput.files[0];
+            if (!file) return;
+            
+            // Validate file type
+            const allowedTypes = ['video/mp4', 'video/webm', 'image/jpeg', 'image/png', 'image/gif'];
+            if (!allowedTypes.includes(file.type)) {
+                alert('Invalid file type. Supported: MP4, WebM, JPG, PNG, GIF');
+                return;
+            }
+            
+            // Validate file size (500MB max)
+            const maxSize = 500 * 1024 * 1024;
+            if (file.size > maxSize) {
+                alert('File too large. Maximum size is 500MB.');
+                return;
+            }
+            
+            // Show progress
+            uploadBtn.disabled = true;
+            progressContainer.classList.remove('hidden');
+            uploadResult.classList.add('hidden');
+            updateProgress(0, 'Getting upload URL...');
+            
+            try {
+                // Step 1: Get presigned upload URL from our API
+                const uploadUrlResponse = await fetch(`${API_BASE}/upload-url`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        filename: file.name,
+                        contentType: file.type,
+                        size: file.size
+                    })
+                });
+                
+                if (!uploadUrlResponse.ok) {
+                    const err = await uploadUrlResponse.json();
+                    throw new Error(err.error || 'Failed to get upload URL');
+                }
+                
+                const { uploadUrl, fileId, b2Key } = await uploadUrlResponse.json();
+                
+                // Step 2: Upload directly to B2 with progress tracking
+                updateProgress(10, 'Uploading to storage...');
+                
+                await uploadWithProgress(uploadUrl, file, (progress) => {
+                    const totalProgress = 10 + (progress * 0.8); // 10-90%
+                    updateProgress(totalProgress, `Uploading... ${Math.round(progress * 100)}%`);
+                });
+                
+                // Step 3: Register the file in our KV
+                updateProgress(90, 'Registering file...');
+                
+                const registerResponse = await fetch(`${API_BASE}/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        fileId,
+                        filename: file.name,
+                        contentType: file.type,
+                        size: file.size,
+                        b2Key
+                    })
+                });
+                
+                if (!registerResponse.ok) {
+                    throw new Error('Failed to register file');
+                }
+                
+                // Success!
+                updateProgress(100, 'Complete!');
+                
+                setTimeout(() => {
+                    progressContainer.classList.add('hidden');
+                    uploadResult.classList.remove('hidden');
+                    
+                    const embedUrl = `${EMBED_BASE}/${fileId}`;
+                    const embedCode = `<iframe src="${embedUrl}" width="100%" height="450" frameborder="0" allowfullscreen></iframe>`;
+                    
+                    document.getElementById('result-url').value = embedUrl;
+                    document.getElementById('result-embed').value = embedCode;
+                    
+                    // Reset form and refresh list
+                    uploadForm.reset();
+                    filePreview.classList.add('hidden');
+                    loadFileList();
+                }, 500);
+                
+            } catch (err) {
+                console.error('Upload error:', err);
+                alert('Upload failed: ' + err.message);
+                progressContainer.classList.add('hidden');
+            } finally {
+                uploadBtn.disabled = false;
+            }
+        });
+        
+        function updateProgress(percent, status) {
+            progressBar.style.width = `${percent}%`;
+            uploadStatus.textContent = status;
+        }
+        
+        function uploadWithProgress(url, file, onProgress) {
+            return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        onProgress(e.loaded / e.total);
+                    }
+                });
+                
+                xhr.addEventListener('load', () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        resolve(xhr.response);
+                    } else {
+                        reject(new Error(`Upload failed with status ${xhr.status}`));
+                    }
+                });
+                
+                xhr.addEventListener('error', () => reject(new Error('Upload failed')));
+                xhr.addEventListener('abort', () => reject(new Error('Upload aborted')));
+                
+                xhr.open('PUT', url);
+                xhr.setRequestHeader('Content-Type', file.type);
+                xhr.send(file);
+            });
+        }
+        
+        // ============================================
+        // File List
+        // ============================================
+        
+        async function loadFileList() {
+            fileList.innerHTML = '<p class="text-slate-400 text-center py-4">Loading files...</p>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/list`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to load files');
+                }
+                
+                const files = await response.json();
+                fileCount.textContent = files.length;
+                
+                if (files.length === 0) {
+                    fileList.innerHTML = '<p class="text-slate-400 text-center py-4">No files uploaded yet</p>';
+                    return;
+                }
+                
+                fileList.innerHTML = files.map(file => createFileItem(file)).join('');
+                
+            } catch (err) {
+                console.error('Load files error:', err);
+                fileList.innerHTML = '<p class="text-red-400 text-center py-4">Failed to load files</p>';
+            }
+        }
+        
+        function createFileItem(file) {
+            const isVideo = file.contentType.startsWith('video/');
+            const embedUrl = `${EMBED_BASE}/${file.fileId}`;
+            const embedCode = `<iframe src="${embedUrl}" width="100%" height="450" frameborder="0" allowfullscreen></iframe>`;
+            const date = new Date(file.uploadDate).toLocaleDateString();
+            const size = formatFileSize(file.size);
+            
+            // Type badge
+            const typeBadge = isVideo 
+                ? '<span class="px-2 py-0.5 bg-blue-600/30 text-blue-400 text-xs rounded">VIDEO</span>'
+                : '<span class="px-2 py-0.5 bg-green-600/30 text-green-400 text-xs rounded">IMAGE</span>';
+            
+            // Icon based on type
+            const icon = isVideo 
+                ? `<svg class="w-8 h-8 text-blue-400" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`
+                : `<svg class="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>`;
+            
+            return `
+                <div class="file-item flex items-center gap-4 p-3 rounded-lg border border-slate-700 transition-colors">
+                    <div class="w-12 h-12 bg-slate-700 rounded flex items-center justify-center flex-shrink-0 cursor-pointer hover:bg-slate-600" onclick="previewFile('${file.fileId}')">
+                        ${icon}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-1">
+                            <p class="font-medium truncate" title="${file.filename}">${file.filename}</p>
+                            ${typeBadge}
+                        </div>
+                        <p class="text-sm text-slate-400">${size} • ${date}</p>
+                    </div>
+                    <div class="flex gap-2 flex-shrink-0">
+                        <button 
+                            onclick="copyText('${embedUrl}')"
+                            class="copy-btn bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-sm transition-colors"
+                            title="Copy embed URL"
+                        >
+                            URL
+                        </button>
+                        <button 
+                            onclick="copyText(\`${embedCode.replace(/`/g, '\\`')}\`)"
+                            class="copy-btn bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded text-sm transition-colors"
+                            title="Copy iframe embed code"
+                        >
+                            Embed
+                        </button>
+                        <button 
+                            onclick="deleteFile('${file.fileId}')"
+                            class="copy-btn bg-red-600/20 hover:bg-red-600/40 text-red-400 px-3 py-1.5 rounded text-sm transition-colors"
+                            title="Delete file"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // ============================================
+        // Preview Modal
+        // ============================================
+        
+        function previewFile(fileId) {
+            const embedUrl = `${EMBED_BASE}/${fileId}`;
+            const modalContent = document.getElementById('modal-content');
+            const modalTitle = document.getElementById('modal-title');
+            
+            modalTitle.textContent = 'Loading preview...';
+            modalContent.innerHTML = `
+                <iframe 
+                    src="${embedUrl}" 
+                    class="w-full h-[60vh] border-0"
+                    allowfullscreen
+                ></iframe>
+            `;
+            
+            document.getElementById('preview-modal').classList.remove('hidden');
+            
+            // Get file name from list
+            fetch(`${API_BASE}/list`, {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            }).then(r => r.json()).then(files => {
+                const file = files.find(f => f.fileId === fileId);
+                if (file) modalTitle.textContent = file.filename;
+            });
+        }
+        
+        function closePreviewModal() {
+            document.getElementById('preview-modal').classList.add('hidden');
+            document.getElementById('modal-content').innerHTML = '';
+        }
+        
+        // Close modal on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closePreviewModal();
+        });
+        
+        // Close modal on backdrop click
+        document.getElementById('preview-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'preview-modal') closePreviewModal();
+        });
+        
+        // ============================================
+        // Delete File
+        // ============================================
+        
+        async function deleteFile(fileId) {
+            if (!confirm('Are you sure you want to delete this file? This cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/delete`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ fileId })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to delete file');
+                }
+                
+                showToast('File deleted');
+                loadFileList();
+                
+            } catch (err) {
+                console.error('Delete error:', err);
+                alert('Failed to delete file: ' + err.message);
+            }
+        }
+        
+        // ============================================
+        // Utility Functions
+        // ============================================
+        
+        function copyToClipboard(inputId) {
+            const input = document.getElementById(inputId);
+            copyText(input.value);
+        }
+        
+        function copyText(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('Copied to clipboard!');
+            }).catch(err => {
+                console.error('Copy failed:', err);
+                // Fallback for older browsers
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showToast('Copied to clipboard!');
+            });
+        }
+        
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.remove('translate-y-full', 'opacity-0');
+            
+            setTimeout(() => {
+                toast.classList.add('translate-y-full', 'opacity-0');
+            }, 2000);
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+    </script>
+</body>
+</html>
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ password })

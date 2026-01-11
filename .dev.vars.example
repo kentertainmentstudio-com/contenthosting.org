@@ -1,17 +1,47 @@
-# Local Development Environment Variables
+# .dev.vars.example
 # 
-# Copy this file to .dev.vars and fill in your values.
+# Copy this file to .dev.vars and fill in your values
 # NEVER commit .dev.vars to version control!
 #
-# Usage: npx wrangler pages dev public
+# Usage: cp .dev.vars.example .dev.vars
 
-# Admin password hash (SHA-256)
-# Generate with: echo -n "your-password" | sha256sum
+# ============================================
+# Backblaze B2 Configuration
+# ============================================
+
+# Your B2 Application Key ID (starts with 004...)
+B2_KEY_ID=004xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# Your B2 Application Key (shown only once when created)
+B2_APP_KEY=K004xxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# Your B2 bucket name
+B2_BUCKET=contenthosting-media
+
+# Your B2 region (found in bucket settings)
+# Common regions: us-west-004, us-west-000, eu-central-003
+B2_REGION=us-west-004
+
+# Your B2 S3-compatible endpoint
+# Format: s3.{region}.backblazeb2.com
+B2_ENDPOINT=s3.us-west-004.backblazeb2.com
+
+# ============================================
+# Admin Authentication
+# ============================================
+
+# SHA-256 hash of your admin password
+# Generate with: npm run hash-password
+# Example: If password is "admin123" the hash would be:
+# 240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9
 ADMIN_PASSWORD_HASH=your_sha256_hash_here
 
-# Backblaze B2 credentials
-B2_KEY_ID=004xxxxxxxxxxxx000000001
-B2_APP_KEY=K004xxxxxxxxxxxxxxxxxxxxxxxxxxx
-B2_BUCKET=contenthosting-media
-B2_ENDPOINT=s3.us-west-004.backblazeb2.com
-B2_REGION=us-west-004
+# ============================================
+# Optional: Public Bucket URL (if using public bucket)
+# ============================================
+# If your bucket is public, you can set a friendly URL
+# This bypasses signed URLs for embed pages
+# 
+# B2_PUBLIC_URL=https://f004.backblazeb2.com/file/contenthosting-media
+# Or with custom CNAME:
+# B2_PUBLIC_URL=https://media.contenthosting.org

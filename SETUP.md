@@ -1,65 +1,58 @@
-# Setup Instructions
+# ContentHosting.org - Complete Setup Guide
 
-Complete step-by-step guide to deploy ContentHosting.org
+This guide walks you through setting up your self-hosted video/image embed system from scratch.
 
 ---
 
 ## Prerequisites
 
-- Cloudflare account (free tier works)
-- Backblaze B2 account (free tier: 10GB storage)
-- Domain: contenthosting.org (or your own domain)
-- Node.js 18+ installed locally
-- Git installed
+- [Node.js](https://nodejs.org/) v18+ installed
+- [Cloudflare account](https://cloudflare.com/) with domain connected
+- [Backblaze B2 account](https://www.backblaze.com/b2/cloud-storage.html) (free tier: 10GB)
+- Git for version control
 
 ---
 
-## Step 1: Add Domain to Cloudflare
+## Step 1: Backblaze B2 Setup
 
-1. Log into [Cloudflare Dashboard](https://dash.cloudflare.com)
-2. Click **"Add a Site"**
-3. Enter: `contenthosting.org`
-4. Select **Free plan**
-5. Cloudflare will scan existing DNS records
-6. Update your domain registrar's nameservers to Cloudflare's:
-   - Usually something like: `xxx.ns.cloudflare.com`
-7. Wait for DNS propagation (can take up to 24 hours)
+### 1.1 Create a B2 Bucket
 
----
-
-## Step 2: Create Backblaze B2 Bucket
-
-1. Sign up at [Backblaze B2](https://www.backblaze.com/b2/sign-up.html)
-2. Go to **"Buckets"** → **"Create a Bucket"**
+1. Log in to [Backblaze B2](https://secure.backblaze.com/b2_buckets.htm)
+2. Click **"Create a Bucket"**
 3. Configure:
-   - **Bucket Name**: `contenthosting-media` (must be globally unique, add random suffix if taken)
-   - **Files in Bucket**: **Private**
-   - **Default Encryption**: None (optional)
+   - **Bucket Name**: `contenthosting-media` (must be globally unique)
+   - **Files in Bucket are**: Choose one:
+     - **Public** ✅ (Recommended - simpler, works without signed URLs)
+     - **Private** (More secure, requires signed URLs for every file access)
+   - **Default Encryption**: None (or Server-Side if preferred)
    - **Object Lock**: Disabled
 4. Click **"Create a Bucket"**
-5. Note down:
-   - **Bucket Name**: `contenthosting-media`
-   - **Endpoint**: `s3.us-west-004.backblazeb2.com` (varies by region)
-   - **Bucket ID**: Found in bucket details
 
-### Create Application Key
+### 1.2 Note Your Bucket Info
 
-1. Go to **"App Keys"** → **"Add a New Application Key"**
-2. Configure:
-   - **Name**: `contenthosting-key`
-   - **Allow access to Bucket**: Select your bucket
-   - **Type of Access**: **Read and Write**
-   - **Allow List All Bucket Names**: ✓ Check this
+After creating the bucket, note these values:
+- **Bucket Name**: `contenthosting-media`
+- **Endpoint**: e.g., `s3.us-west-004.backblazeb2.com`
+- **Region**: e.g., `us-west-004`
+- **Friendly URL** (for public buckets): `https://f004.backblazeb2.com/file/contenthosting-media/`
+
+### 1.3 Create Application Key
+
+1. Go to **App Keys** in B2 sidebar
+2. Click **"Add a New Application Key"**
+3. Configure:
+   - **Name**: `contenthosting-api`
+   - **Allow access to Bucket(s)**: Select your bucket
+   - **Type of Access**: Read and Write
+   - **Allow List All Bucket Names**: Yes (recommended)
    - **File name prefix**: Leave empty
-   - **Duration**: Leave default
-3. Click **"Create New Key"**
-4. **IMPORTANT**: Copy these immediately (shown only once):
-   - **keyID**: `004xxxxxxxxxxxx000000001` (this is your Access Key ID)
-   - **applicationKey**: `K004xxxxxxxxxxxxxxxxxxxxxxxxxxx` (this is your Secret Key)
+4. Click **"Create New Key"**
+5. **IMPORTANT**: Copy and save immediately:
+   - **keyID**: e.g., `004abc123def456...`
+   - **applicationKey**: e.g., `K004xyz789...` (shown only once!)
 
-### Get S3-Compatible Credentials
+### 1.4 S3-Compatible Credentials Summary
 
-B2 is S3-compatible. Your credentials:
 ```
 B2_KEY_ID=004xxxxxxxxxxxx000000001
 B2_APP_KEY=K004xxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -68,215 +61,222 @@ B2_ENDPOINT=s3.us-west-004.backblazeb2.com
 B2_REGION=us-west-004
 ```
 
-Find your endpoint/region in Bucket details → "Endpoint" field.
+### 1.5 CORS Configuration (Required for Browser Uploads)
+
+1. Go to **Bucket Settings** → **CORS Rules**
+2. Add this CORS configuration:
+
+```json
+[
+  {
+    "corsRuleName": "contenthosting-uploads",
+    "allowedOrigins": [
+      "https://contenthosting.org",
+      "http://localhost:8788"
+    ],
+    "allowedOperations": [
+      "s3_put",
+      "s3_get",
+      "s3_head"
+    ],
+    "allowedHeaders": [
+      "authorization",
+      "content-type",
+      "content-length",
+      "x-amz-date",
+      "x-amz-content-sha256"
+    ],
+    "exposeHeaders": [
+      "ETag",
+      "x-amz-version-id"
+    ],
+    "maxAgeSeconds": 3600
+  }
+]
+```
+
+3. Save the CORS configuration
 
 ---
 
-## Step 3: Set Up Workers KV Namespace
+## Step 2: Cloudflare Configuration
 
-1. In Cloudflare Dashboard, go to **Workers & Pages** → **KV**
+### 2.1 Create Workers KV Namespace
+
+1. Go to Cloudflare Dashboard → **Workers & Pages** → **KV**
 2. Click **"Create a namespace"**
-3. Name it: `CONTENT_METADATA`
-4. Note the **Namespace ID** (you'll need this for wrangler.toml)
+3. Name it: `contenthosting-kv`
+4. Click **Create**
+5. **Copy the Namespace ID** (you'll need this for wrangler.toml)
+
+### 2.2 (Optional) Set Up Media Subdomain
+
+For bandwidth efficiency (Cloudflare Bandwidth Alliance = FREE egress from B2):
+
+1. Go to **DNS** in Cloudflare dashboard
+2. Add a new CNAME record:
+   - **Type**: CNAME
+   - **Name**: `media`
+   - **Target**: `f004.backblazeb2.com` (your B2 endpoint)
+   - **Proxy status**: **DNS only (grey cloud)** ⚠️ IMPORTANT
+   - **TTL**: Auto
+3. Click **Save**
+
+> ⚠️ **Why DNS-only (grey cloud)?**
+> Cloudflare's Terms of Service prohibit proxying video content through their CDN on free/pro plans. Using DNS-only mode ensures compliance while still benefiting from the Bandwidth Alliance (free B2 egress to Cloudflare).
 
 ---
 
-## Step 4: Create Cloudflare Pages Project
+## Step 3: Local Project Setup
 
-### Option A: GitHub Integration (Recommended)
-
-1. Push this repo to GitHub
-2. In Cloudflare Dashboard → **Workers & Pages** → **Create**
-3. Select **"Pages"** → **"Connect to Git"**
-4. Select your GitHub repo
-5. Configure build:
-   - **Build command**: (leave empty)
-   - **Build output directory**: `public`
-   - **Root directory**: `/`
-6. Click **"Save and Deploy"**
-
-### Option B: Direct Upload with Wrangler
+### 3.1 Clone/Initialize Project
 
 ```bash
-# Install Wrangler CLI
-npm install -g wrangler
-
-# Login to Cloudflare
-wrangler login
-
-# Deploy (from project root)
-wrangler pages deploy public --project-name=contenthosting
+cd contenthosting.org
+npm install
 ```
 
----
+### 3.2 Create Environment Variables File
 
-## Step 5: Configure Environment Variables
+Create `.dev.vars` in the project root (this file is gitignored):
 
-### In Cloudflare Dashboard:
+```bash
+# .dev.vars - Local development secrets
 
-1. Go to your Pages project → **Settings** → **Environment variables**
-2. Add these variables for **Production** (and Preview if needed):
-
-| Variable | Value | Notes |
-|----------|-------|-------|
-| `ADMIN_PASSWORD_HASH` | `$2a$10$...` | See "How to Hash Password" below |
-| `B2_KEY_ID` | `004xxxxxxxxxxxx000000001` | From B2 App Key |
-| `B2_APP_KEY` | `K004xxxxxxxxxxxxx` | From B2 App Key |
-| `B2_BUCKET` | `contenthosting-media` | Your bucket name |
-| `B2_ENDPOINT` | `s3.us-west-004.backblazeb2.com` | Your B2 endpoint |
-| `B2_REGION` | `us-west-004` | Your B2 region |
-
-### For Local Development (.dev.vars):
-
-Create `.dev.vars` file in project root (never commit this!):
-
-```env
-ADMIN_PASSWORD_HASH=your_bcrypt_hash_here
-B2_KEY_ID=004xxxxxxxxxxxx000000001
-B2_APP_KEY=K004xxxxxxxxxxxxxxxxxxxxxxxxxxx
+# Backblaze B2 Credentials
+B2_KEY_ID=004abc123def456789
+B2_APP_KEY=K004xyz789yourSecretKeyHere
 B2_BUCKET=contenthosting-media
-B2_ENDPOINT=s3.us-west-004.backblazeb2.com
 B2_REGION=us-west-004
+B2_ENDPOINT=s3.us-west-004.backblazeb2.com
+
+# Admin Password Hash (see Step 3.3)
+ADMIN_PASSWORD_HASH=your_sha256_hash_here
 ```
 
----
+### 3.3 Generate Admin Password Hash
 
-## Step 6: Configure KV Binding
+Run the password hash utility:
 
-1. Go to Pages project → **Settings** → **Functions**
-2. Scroll to **KV namespace bindings**
-3. Add binding:
-   - **Variable name**: `CONTENT_KV`
-   - **KV namespace**: Select `CONTENT_METADATA`
-4. Save
+```bash
+npm run hash-password
+```
 
-Or add to `wrangler.toml`:
+Enter your desired password when prompted. Copy the SHA-256 hash and paste it into:
+1. `.dev.vars` for local development
+2. Cloudflare Dashboard for production (see Step 4)
+
+**Example:**
+```
+Enter password to hash: MySecretPassword123
+
+=== Password Hash ===
+SHA-256: 5e884898da28047d55d4c14f6c9a0b37e23e5b6b9c0d...
+
+Add this to your environment variables as ADMIN_PASSWORD_HASH
+```
+
+### 3.4 Update wrangler.toml
+
+Edit `wrangler.toml` with your actual KV namespace ID:
+
 ```toml
+name = "contenthosting"
+compatibility_date = "2024-01-01"
+pages_build_output_dir = "public"
+
 [[kv_namespaces]]
 binding = "CONTENT_KV"
-id = "your-namespace-id-here"
+id = "YOUR_KV_NAMESPACE_ID_HERE"
 ```
 
 ---
 
-## Step 7: DNS Setup for Media Subdomain
+## Step 4: Cloudflare Production Secrets
 
-**CRITICAL**: Set media subdomain to **DNS-only (grey cloud)** to avoid Cloudflare ToS issues with video streaming.
+### 4.1 Set Environment Variables in Cloudflare
 
-1. Go to Cloudflare Dashboard → DNS
-2. Add record:
-   - **Type**: CNAME
-   - **Name**: `media`
-   - **Target**: `f004.backblazeb2.com` (your B2 friendly URL hostname)
-   - **Proxy status**: **DNS only** (click to turn OFF orange cloud → grey cloud)
+1. Go to Cloudflare Dashboard → **Workers & Pages**
+2. Select your **contenthosting** project
+3. Go to **Settings** → **Environment variables**
+4. Add these variables (use "Encrypt" for secrets):
+
+| Variable | Value | Type |
+|----------|-------|------|
+| `B2_KEY_ID` | Your B2 key ID | Encrypted |
+| `B2_APP_KEY` | Your B2 application key | Encrypted |
+| `B2_BUCKET` | `contenthosting-media` | Plain text |
+| `B2_REGION` | `us-west-004` | Plain text |
+| `B2_ENDPOINT` | `s3.us-west-004.backblazeb2.com` | Plain text |
+| `ADMIN_PASSWORD_HASH` | Your SHA-256 hash | Encrypted |
+
+### 4.2 Bind KV Namespace
+
+1. In the same Settings page, go to **Functions** → **KV namespace bindings**
+2. Add binding:
+   - **Variable name**: `CONTENT_KV`
+   - **KV namespace**: Select `contenthosting-kv`
 3. Save
 
-Alternative (if using B2 S3 endpoint):
-   - **Type**: CNAME
-   - **Name**: `media`
-   - **Target**: `s3.us-west-004.backblazeb2.com`
-   - **Proxy status**: **DNS only**
-
 ---
 
-## Step 8: Set Custom Domain
+## Step 5: Deploy
 
-1. Go to Pages project → **Custom domains**
-2. Add: `contenthosting.org`
-3. Cloudflare will automatically configure DNS
-4. Wait for SSL certificate (usually instant)
-
----
-
-## How to Hash Your Admin Password
-
-### Option 1: Using Node.js (recommended)
-
-```javascript
-// hash-password.js
-const crypto = require('crypto');
-
-const password = 'your-secure-password-here';
-const hash = crypto.createHash('sha256').update(password).digest('hex');
-console.log('SHA-256 Hash:', hash);
-// Use this hash as ADMIN_PASSWORD_HASH
-```
-
-Run: `node hash-password.js`
-
-### Option 2: Online (less secure, use only for testing)
-
-Use a SHA-256 generator online, but **never** use your real password on third-party sites.
-
-### Option 3: Using Terminal
+### 5.1 Test Locally First
 
 ```bash
-echo -n "your-secure-password-here" | sha256sum
+npm run dev
 ```
 
----
+This starts a local server at `http://localhost:8788`.
 
-## How to Deploy
+Test the full flow:
+1. Go to `http://localhost:8788/admin`
+2. Log in with your password
+3. Upload a test file
+4. Verify it appears in the file list
+5. Test embed URL in a new tab
 
-### Initial Deployment
+### 5.2 Deploy to Cloudflare Pages
 
-```bash
-# Clone the repo
-git clone https://github.com/your-username/contenthosting.org.git
-cd contenthosting.org
+**Option A: Via Git (Recommended)**
 
-# Install dependencies
-npm install
-
-# Login to Cloudflare
-npx wrangler login
-
-# Deploy to Pages
-npx wrangler pages deploy public --project-name=contenthosting
-```
-
-### Subsequent Deployments
+If connected to GitHub, just push:
 
 ```bash
-# After making changes
-npx wrangler pages deploy public --project-name=contenthosting
-
-# Or if using GitHub integration, just push:
 git add .
-git commit -m "Update"
-git push
+git commit -m "Setup complete"
+git push origin main
 ```
 
----
+Cloudflare Pages will auto-deploy.
 
-## Local Development
+**Option B: Direct Deploy**
 
 ```bash
-# Start local dev server with Pages Functions
-npx wrangler pages dev public
-
-# This will:
-# - Serve static files from /public
-# - Run Pages Functions from /functions
-# - Use .dev.vars for environment variables
-# - Simulate KV bindings
+npm run deploy
 ```
 
-Open: http://localhost:8788/admin
+### 5.3 Verify Production
+
+1. Visit `https://contenthosting.org/admin`
+2. Log in with your password
+3. Upload a test file
+4. Test the embed URL: `https://contenthosting.org/embed/{fileId}`
 
 ---
 
-## Test the Full Flow
+## Step 6: Testing
 
-1. **Open Admin**: https://contenthosting.org/admin
-2. **Login**: Enter your password
-3. **Upload**: Select a video or image file
-4. **Wait**: File uploads directly to B2
-5. **Copy Embed**: Click "Copy Embed Code" button
-6. **Test**: Paste iframe into test HTML file
-7. **Verify**: Video plays with Plyr.io, image displays
+### Test the Complete Flow
 
-### Test HTML File
+1. **Login Test**: Go to `/admin`, enter password
+2. **Upload Test**: Select MP4/image, click Upload
+3. **List Test**: File should appear in the list
+4. **Embed Test**: Copy embed URL, open in new tab
+5. **Delete Test**: Delete a file, verify removal
+
+### Test Embed in HTML
 
 ```html
 <!DOCTYPE html>
@@ -284,61 +284,121 @@ Open: http://localhost:8788/admin
 <head><title>Embed Test</title></head>
 <body>
   <h1>Testing Embed</h1>
-  
-  <!-- Paste your copied embed code here -->
   <iframe 
-    src="https://contenthosting.org/embed/abc123" 
+    src="https://contenthosting.org/embed/YOUR_FILE_ID" 
     width="100%" 
     height="450" 
     frameborder="0" 
     allowfullscreen>
   </iframe>
-  
 </body>
 </html>
 ```
 
 ---
 
-## Troubleshooting
+## Handling Large Files (>100MB)
 
-### "Upload failed" error
-- Check B2 credentials are correct
-- Verify bucket exists and is private
-- Check browser console for detailed error
+Your setup supports files up to **500MB** because:
 
-### "Access denied" on embed
-- Signed URL may have expired (30 min default)
-- Refresh the embed page to get new signed URL
+1. **Browser uploads directly to B2** - bypasses Cloudflare Worker's 100MB body limit
+2. **Presigned URLs** - Worker only generates URLs, doesn't proxy file data
 
-### CORS errors
-- B2 bucket needs CORS configuration (see below)
-- Make sure media subdomain DNS is set up
-
-### Configure B2 CORS
-
-In Backblaze B2, go to Bucket Settings → CORS Rules:
-
-```json
-[
-  {
-    "corsRuleName": "allowAll",
-    "allowedOrigins": ["*"],
-    "allowedHeaders": ["*"],
-    "allowedOperations": ["s3_put", "s3_get", "s3_head"],
-    "exposeHeaders": ["ETag"],
-    "maxAgeSeconds": 3600
-  }
-]
-```
+### For files >500MB:
+- Increase the `maxSize` limit in `functions/api/upload-url.js`
+- Consider implementing multipart uploads for files >5GB
+- Backblaze B2 supports files up to 10TB with multipart
 
 ---
 
-## Security Checklist
+## Troubleshooting
 
-- [ ] Admin password is strong (16+ characters)
-- [ ] Password hash is stored in env, not code
-- [ ] B2 bucket is set to Private
-- [ ] Media subdomain is DNS-only (grey cloud)
-- [ ] .dev.vars is in .gitignore
-- [ ] Signed URLs expire in 30-60 minutes
+### "Failed to get upload URL"
+- **Cause**: B2 credentials incorrect or missing
+- **Fix**: Verify `B2_KEY_ID` and `B2_APP_KEY` in environment variables
+
+### CORS Errors During Upload
+- **Cause**: B2 CORS rules not configured
+- **Fix**: Add CORS rules as shown in Step 1.5
+
+### "Invalid password"
+- **Cause**: Password hash mismatch
+- **Fix**: Regenerate hash with `npm run hash-password` and update env vars
+
+### Embed Page Shows "Media not found"
+- **Cause**: File metadata not in KV
+- **Fix**: Try re-uploading the file
+
+### Large Files Fail (>100MB)
+- **Cause**: Network timeout
+- **Fix**: Ensure stable connection; files upload directly to B2
+
+### Video Won't Play
+- **Cause**: Signed URL expired
+- **Fix**: Refresh embed page (generates new URL)
+
+---
+
+## Security & ToS Notes
+
+### Security Best Practices
+
+1. **Never commit `.dev.vars`** - It's gitignored by default
+2. **Use strong admin password** - 20+ characters recommended
+3. **Keep DNS-only (grey cloud)** on media subdomain
+4. **Rotate B2 keys periodically** - Every 90 days
+5. **Monitor B2 usage** - Set up alerts for unexpected usage
+
+### Cloudflare ToS Compliance
+
+- ✅ **Media subdomain DNS-only**: Video traffic bypasses Cloudflare proxy
+- ✅ **Main site proxied**: HTML pages served through Cloudflare CDN
+- ✅ **Bandwidth Alliance**: Free egress from B2 to Cloudflare network
+
+### Public vs Private Bucket
+
+| Feature | Public Bucket | Private Bucket |
+|---------|--------------|----------------|
+| Setup complexity | Simple | More complex |
+| File access | Direct URL | Signed URL required |
+| Security | Anyone with URL can access | Time-limited access |
+| Recommended for | Public content | Sensitive content |
+
+---
+
+## Bandwidth Alliance Benefits
+
+When using Cloudflare with Backblaze B2:
+
+| Traffic Path | Cost |
+|--------------|------|
+| B2 → Cloudflare (Bandwidth Alliance) | **FREE** |
+| Cloudflare → Visitor | **FREE** |
+
+Result: Zero egress fees when properly configured!
+
+---
+
+## Quick Reference
+
+### URLs
+- Admin: `https://contenthosting.org/admin`
+- Embed: `https://contenthosting.org/embed/{fileId}`
+- API: `https://contenthosting.org/api/*`
+
+### Commands
+```bash
+npm run dev          # Start local development
+npm run deploy       # Deploy to Cloudflare
+npm run hash-password # Generate password hash
+```
+
+### Environment Variables
+```bash
+B2_KEY_ID            # Backblaze B2 key ID
+B2_APP_KEY           # Backblaze B2 application key
+B2_BUCKET            # Bucket name
+B2_REGION            # e.g., us-west-004
+B2_ENDPOINT          # e.g., s3.us-west-004.backblazeb2.com
+ADMIN_PASSWORD_HASH  # SHA-256 hash of admin password
+```
