@@ -1,0 +1,17 @@
+{
+  "name": "contenthosting",
+  "version": "1.0.0",
+  "description": "Self-hosted video and image embed generator",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler pages dev public --kv CONTENT_KV",
+    "deploy": "wrangler pages deploy public --project-name=contenthosting",
+    "hash-password": "node scripts/hash-password.js"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

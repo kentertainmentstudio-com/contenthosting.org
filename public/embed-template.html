@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Player</title>
+    
+    <!-- Plyr.io CSS -->
+    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+    
+    <style>
+        /* 
+         * Clean embed page - black background, no chrome
+         * Designed to be embedded via iframe
+         */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            overflow: hidden;
+        }
+        
+        /* Video container - full viewport */
+        .video-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* Video player styles */
+        .plyr {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .plyr--video {
+            height: 100%;
+        }
+        
+        .plyr__video-wrapper {
+            height: 100%;
+        }
+        
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        
+        /* Image container */
+        .image-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .image-container img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        
+        /* Loading state */
+        .loading {
+            color: #666;
+            font-family: system-ui, -apple-system, sans-serif;
+            font-size: 14px;
+        }
+        
+        /* Error state */
+        .error {
+            color: #ef4444;
+            font-family: system-ui, -apple-system, sans-serif;
+            font-size: 14px;
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Content will be injected by the server -->
+    <div id="content">
+        <div class="video-container">
+            <p class="loading">Loading...</p>
+        </div>
+    </div>
+
+    <!-- Plyr.io JS -->
+    <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
+    
+    <script>
+        // This script handles client-side initialization
+        // The server injects the media URL and type
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            // Check if media data was injected by server
+            const mediaData = window.__MEDIA_DATA__;
+            
+            if (!mediaData) {
+                // If no data, we're viewing the template directly
+                // In production, the server will inject the data
+                console.log('No media data - this is the template');
+                return;
+            }
+            
+            const { url, type, filename } = mediaData;
+            const contentEl = document.getElementById('content');
+            
+            if (type.startsWith('video/')) {
+                // Render video player
+                contentEl.innerHTML = `
+                    <div class="video-container">
+                        <video id="player" playsinline controls>
+                            <source src="${url}" type="${type}" />
+                        </video>
+                    </div>
+                `;
+                
+                // Initialize Plyr
+                const player = new Plyr('#player', {
+                    controls: [
+                        'play-large',
+                        'play',
+                        'progress',
+                        'current-time',
+                        'mute',
+                        'volume',
+                        'captions',
+                        'settings',
+                        'pip',
+                        'airplay',
+                        'fullscreen'
+                    ],
+                    settings: ['captions', 'quality', 'speed'],
+                    ratio: '16:9',
+                    hideControls: true,
+                    resetOnEnd: true
+                });
+                
+            } else if (type.startsWith('image/')) {
+                // Render image
+                contentEl.innerHTML = `
+                    <div class="image-container">
+                        <img src="${url}" alt="${filename || 'Image'}" />
+                    </div>
+                `;
+            } else {
+                // Unknown type
+                contentEl.innerHTML = `
+                    <div class="error">
+                        <p>Unsupported media type</p>
+                    </div>
+                `;
+            }
+        });
+    </script>
+</body>
+</html>

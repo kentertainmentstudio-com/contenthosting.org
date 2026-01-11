@@ -1,0 +1,17 @@
+# Local Development Environment Variables
+# 
+# Copy this file to .dev.vars and fill in your values.
+# NEVER commit .dev.vars to version control!
+#
+# Usage: npx wrangler pages dev public
+
+# Admin password hash (SHA-256)
+# Generate with: echo -n "your-password" | sha256sum
+ADMIN_PASSWORD_HASH=your_sha256_hash_here
+
+# Backblaze B2 credentials
+B2_KEY_ID=004xxxxxxxxxxxx000000001
+B2_APP_KEY=K004xxxxxxxxxxxxxxxxxxxxxxxxxxx
+B2_BUCKET=contenthosting-media
+B2_ENDPOINT=s3.us-west-004.backblazeb2.com
+B2_REGION=us-west-004
