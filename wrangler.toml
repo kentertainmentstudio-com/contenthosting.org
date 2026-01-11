@@ -11,9 +11,9 @@ pages_build_output_dir = "public"
 
 # KV Namespace binding
 # Replace with your actual namespace ID from Cloudflare dashboard
-[[kv_namespaces]]
-binding = "CONTENT_KV"
-id = "your-kv-namespace-id-here"
+# [[kv_namespaces]]
+# binding = "CONTENT_KV"
+# id = "your-kv-namespace-id-here"
 
 # For local development, you can use a preview namespace
 # [[kv_namespaces]]
