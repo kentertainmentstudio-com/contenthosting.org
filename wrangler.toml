@@ -21,7 +21,7 @@ pages_build_output_dir = "public"
 [[d1_databases]]
 binding = "DB"
 database_name = "contenthosting-db"
-database_id = "f7c6fb7f-712c-4512-a7e6-1bbbd46a2b97"
+database_id = "568810b9-98a9-4647-9ffa-2be769660696"
 
 # ============================================
 # KV Namespace Binding (Sessions Only)
