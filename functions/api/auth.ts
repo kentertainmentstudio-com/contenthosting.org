@@ -32,8 +32,8 @@ export async function onRequestPost(context: PagesContext): Promise<Response> {
         const hashArray = Array.from(new Uint8Array(hashBuffer));
         const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
         
-        // Compare with stored hash
-        const storedHash = env.ADMIN_PASSWORD_HASH;
+        // Compare with stored hash (trim to remove any accidental whitespace)
+        const storedHash = env.ADMIN_PASSWORD_HASH?.trim();
         
         if (!storedHash) {
             console.error('ADMIN_PASSWORD_HASH not configured');
@@ -42,6 +42,11 @@ export async function onRequestPost(context: PagesContext): Promise<Response> {
                 headers: { 'Content-Type': 'application/json' }
             });
         }
+        
+        // Log hash comparison for debugging (remove in production)
+        console.log('Input hash:', hashHex);
+        console.log('Stored hash:', storedHash.toLowerCase());
+        console.log('Match:', hashHex === storedHash.toLowerCase());
         
         if (hashHex !== storedHash.toLowerCase()) {
             return new Response(JSON.stringify({ error: 'Invalid password' } satisfies AuthResponse), {
