@@ -1,12 +1,14 @@
 {
   "name": "contenthosting",
-  "version": "1.0.0",
-  "description": "Self-hosted video and image embed generator",
+  "version": "2.0.0",
+  "description": "Self-hosted video and image embed generator with D1 database",
   "private": true,
   "scripts": {
-    "dev": "wrangler pages dev public --kv CONTENT_KV",
+    "dev": "wrangler pages dev public --kv CONTENT_KV --d1 DB",
     "deploy": "wrangler pages deploy public --project-name=contenthosting",
-    "hash-password": "node scripts/hash-password.js"
+    "hash-password": "node scripts/hash-password.js",
+    "db:init": "wrangler d1 execute contenthosting-db --file=schema.sql",
+    "db:query": "wrangler d1 execute contenthosting-db"
   },
   "devDependencies": {
     "wrangler": "^3.0.0"

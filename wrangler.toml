@@ -1,7 +1,7 @@
 # ContentHosting.org - Wrangler Configuration
 # 
-# This file configures Cloudflare Pages and Workers.
-# Update the KV namespace ID and deploy.
+# This file configures Cloudflare Pages, D1 database, and Workers.
+# Update the D1 database ID and KV namespace ID before deploying.
 
 name = "contenthosting"
 compatibility_date = "2024-01-01"
@@ -10,14 +10,29 @@ compatibility_date = "2024-01-01"
 pages_build_output_dir = "public"
 
 # ============================================
-# KV Namespace Binding
+# D1 Database Binding (File Metadata Storage)
 # ============================================
-# REQUIRED: Replace with your actual namespace ID from Cloudflare dashboard
-# Go to: Workers & Pages → KV → Create namespace → Copy ID
+# Create the database first:
+#   wrangler d1 create contenthosting-db
+#
+# Then update the database_id below with your actual ID
+# Run schema: wrangler d1 execute contenthosting-db --file=schema.sql
+
+[[d1_databases]]
+binding = "DB"
+database_name = "contenthosting-db"
+database_id = "YOUR_D1_DATABASE_ID_HERE"
+
+# ============================================
+# KV Namespace Binding (Sessions Only)
+# ============================================
+# For local development, use a local ID like "local-kv"
+# For production, replace with your actual Cloudflare KV namespace ID
 
 [[kv_namespaces]]
 binding = "CONTENT_KV"
-id = "YOUR_KV_NAMESPACE_ID_HERE"
+id = "local-kv"
+preview_id = "local-kv"
 
 # ============================================
 # Environment Variables (Non-Secret)
@@ -29,6 +44,10 @@ id = "YOUR_KV_NAMESPACE_ID_HERE"
 B2_BUCKET = "contenthosting-media"
 B2_REGION = "us-west-004"
 B2_ENDPOINT = "s3.us-west-004.backblazeb2.com"
+# Public URL for B2 bucket (for media delivery)
+# Format: https://f00X.backblazeb2.com/file/bucket-name
+# Or use custom subdomain: https://media.contenthosting.org/file/bucket-name
+B2_PUBLIC_URL = "https://f004.backblazeb2.com/file/contenthosting-media"
 
 # ============================================
 # Secrets (NEVER put real values here)
@@ -57,4 +76,5 @@ B2_ENDPOINT = "s3.us-west-004.backblazeb2.com"
 # B2_BUCKET=contenthosting-media
 # B2_REGION=us-west-004
 # B2_ENDPOINT=s3.us-west-004.backblazeb2.com
+# B2_PUBLIC_URL=https://f004.backblazeb2.com/file/contenthosting-media
 

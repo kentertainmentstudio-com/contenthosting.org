@@ -6,14 +6,10 @@
  * - Videos: Plyr.io player with modern controls
  * - Images: Responsive img tag centered on black background
  * 
- * Supports both:
- * - Public buckets: Direct URL to B2 (no signing needed)
- * - Private buckets: Signed URLs with configurable expiry
+ * Uses public B2 bucket URLs for permanent embedding (no expiration).
  * 
  * The page is designed to be embedded in iframes.
  */
-
-import { generatePresignedGetUrl } from '../api/_s3-signer.js';
 
 export async function onRequestGet(context) {
     const { params, env } = context;
@@ -25,40 +21,22 @@ export async function onRequestGet(context) {
     }
     
     try {
-        // Get file metadata from KV
-        const data = await env.CONTENT_KV.get(`file:${fileId}`);
+        // Get file metadata from D1 database
+        const metadata = await env.DB.prepare(
+            'SELECT id, filename, type, size, upload_date, b2_key, thumbnail_url, description FROM files WHERE id = ?'
+        ).bind(fileId).first();
         
-        if (!data) {
+        if (!metadata) {
             return new Response(notFoundPage(), {
                 status: 404,
                 headers: { 'Content-Type': 'text/html' }
             });
         }
         
-        const metadata = JSON.parse(data);
+        // Use public B2 URL for permanent embedding (no expiration)
+        const mediaUrl = `${env.B2_PUBLIC_URL}/${metadata.b2_key}`;
         
-        // Determine media URL based on bucket type
-        let mediaUrl;
-        
-        if (env.B2_PUBLIC_URL) {
-            // Public bucket: Use direct URL (no signing needed)
-            // Format: https://f004.backblazeb2.com/file/bucket-name/path/to/file.mp4
-            mediaUrl = `${env.B2_PUBLIC_URL}/${metadata.b2Key}`;
-        } else {
-            // Private bucket: Generate signed URL
-            // Default to 6 hour expiry for embeds (balances security and usability)
-            mediaUrl = await generatePresignedGetUrl({
-                bucket: env.B2_BUCKET,
-                key: metadata.b2Key,
-                accessKeyId: env.B2_KEY_ID,
-                secretAccessKey: env.B2_APP_KEY,
-                region: env.B2_REGION,
-                endpoint: env.B2_ENDPOINT,
-                expiresIn: 21600 // 6 hours for embed pages
-            });
-        }
-        
-        const isVideo = metadata.contentType.startsWith('video/');
+        const isVideo = metadata.type.startsWith('video/');
         
         // Generate the appropriate embed page
         const html = isVideo 
@@ -72,8 +50,8 @@ export async function onRequestGet(context) {
                 // Allow embedding from any origin
                 'X-Frame-Options': 'ALLOWALL',
                 'Content-Security-Policy': "frame-ancestors *;",
-                // Cache the HTML page for 5 minutes (URL will still work due to longer expiry)
-                'Cache-Control': 'public, max-age=300'
+                // Cache the HTML page for 1 hour
+                'Cache-Control': 'public, max-age=3600'
             }
         });
         
@@ -125,7 +103,7 @@ function videoEmbedPage(url, metadata) {
 <body>
     <div class="container">
         <video id="player" playsinline controls>
-            <source src="${escapeHtml(url)}" type="${escapeHtml(metadata.contentType)}" />
+            <source src="${escapeHtml(url)}" type="${escapeHtml(metadata.type)}" />
         </video>
     </div>
     <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
