@@ -106,9 +106,13 @@ async function sign({
 }: SignOptions): Promise<string> {
     const parsedUrl = new URL(url);
     const host = parsedUrl.host;
-    // URL-encode the path segments properly for S3
+    
+    // For S3 Signature V4, the path must be URI-encoded in a specific way:
+    // - Each path segment is encoded separately
+    // - '/' is NOT encoded
+    // - Use the SAME encoded path for both signing AND the final URL
     const pathSegments = parsedUrl.pathname.split('/');
-    const encodedPath = pathSegments.map(segment => encodeURIComponent(segment)).join('/');
+    const encodedPath = pathSegments.map(segment => s3UriEncode(segment)).join('/');
     
     // Current time
     const now = new Date();
@@ -123,7 +127,6 @@ async function sign({
     
     // Build canonical headers - always include host, optionally include others
     // For presigned URLs, we only sign the host header
-    // Content-Type will be matched when the actual request is made
     const signedHeaders = 'host';
     const canonicalHeaders = `host:${host}\n`;
     
@@ -173,9 +176,39 @@ async function sign({
     // Add signature to query parameters
     queryParams.set('X-Amz-Signature', signature);
     
-    // Build final URL - use the original pathname (not encoded) for the final URL
-    // because the browser will encode it again when making the request
-    return `${parsedUrl.origin}${parsedUrl.pathname}?${queryParams.toString()}`;
+    // Build final URL - MUST use the same encoded path that was used for signing
+    return `${parsedUrl.origin}${encodedPath}?${queryParams.toString()}`;
+}
+
+/**
+ * S3-specific URI encoding
+ * AWS requires a specific encoding that differs from standard encodeURIComponent:
+ * - Unreserved characters (A-Z, a-z, 0-9, -, _, ., ~) are NOT encoded
+ * - Everything else is percent-encoded
+ */
+function s3UriEncode(str: string): string {
+    if (!str) return str;
+    
+    let encoded = '';
+    for (let i = 0; i < str.length; i++) {
+        const char = str[i];
+        // Unreserved characters per RFC 3986
+        if (
+            (char >= 'A' && char <= 'Z') ||
+            (char >= 'a' && char <= 'z') ||
+            (char >= '0' && char <= '9') ||
+            char === '-' ||
+            char === '_' ||
+            char === '.' ||
+            char === '~'
+        ) {
+            encoded += char;
+        } else {
+            // Percent-encode everything else
+            encoded += '%' + char.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0');
+        }
+    }
+    return encoded;
 }
 
 /**

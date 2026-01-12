@@ -40,13 +40,13 @@ id = "0f50e6ce307a4beb89d396c7e327c988"
 # These are example values - update for your setup
 
 [vars]
-B2_BUCKET = "contenthosting-media"
-B2_REGION = "us-west-004"
-B2_ENDPOINT = "s3.us-west-004.backblazeb2.com"
+B2_BUCKET = "xpandorax"
+B2_REGION = "us-east-005"
+B2_ENDPOINT = "s3.us-east-005.backblazeb2.com"
 # Public URL for B2 bucket (for media delivery)
 # Format: https://f00X.backblazeb2.com/file/bucket-name
 # Or use custom subdomain: https://media.contenthosting.org/file/bucket-name
-B2_PUBLIC_URL = "https://f004.backblazeb2.com/file/contenthosting-media"
+B2_PUBLIC_URL = "https://f004.backblazeb2.com/file/xpandorax"
 
 # ============================================
 # Secrets (NEVER put real values here)

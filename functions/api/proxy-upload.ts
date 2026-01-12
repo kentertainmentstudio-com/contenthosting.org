@@ -90,6 +90,10 @@ export async function onRequestPost(context: PagesContext): Promise<Response> {
             expiresIn: 3600
         });
         
+        // Log URL for debugging (mask sensitive parts)
+        console.log('Upload URL generated for bucket:', env.B2_BUCKET, 'key:', b2Key);
+        console.log('Using endpoint:', env.B2_ENDPOINT, 'region:', env.B2_REGION);
+        
         // Upload the file to B2 through the Worker
         const fileBuffer = await file.arrayBuffer();
         const uploadResponse = await fetch(uploadUrl, {
@@ -104,7 +108,8 @@ export async function onRequestPost(context: PagesContext): Promise<Response> {
         if (!uploadResponse.ok) {
             const errorText = await uploadResponse.text();
             console.error('B2 upload failed:', uploadResponse.status, errorText);
-            throw new Error(`B2 upload failed: ${uploadResponse.status}`);
+            console.error('Response headers:', JSON.stringify(Object.fromEntries(uploadResponse.headers.entries())));
+            throw new Error(`B2 upload failed: ${uploadResponse.status} - ${errorText.substring(0, 200)}`);
         }
         
         // Register the upload in D1 database
