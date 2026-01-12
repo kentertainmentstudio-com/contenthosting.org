@@ -5,10 +5,15 @@
  * Removes file metadata from KV and optionally from B2.
  */
 
-import { verifyAuth } from './_auth-middleware.js';
-import { deleteObject } from './_s3-signer.js';
+import { verifyAuth } from './_auth-middleware';
+import { deleteObject } from './_s3-signer';
+import type { PagesContext, KVFileMetadata, ApiResponse } from '../types';
 
-export async function onRequestPost(context) {
+interface DeleteRequest {
+    fileId?: string;
+}
+
+export async function onRequestPost(context: PagesContext): Promise<Response> {
     const { request, env } = context;
     
     // Verify authentication
@@ -16,10 +21,10 @@ export async function onRequestPost(context) {
     if (authError) return authError;
     
     try {
-        const { fileId } = await request.json();
+        const { fileId } = await request.json() as DeleteRequest;
         
         if (!fileId) {
-            return new Response(JSON.stringify({ error: 'Missing fileId' }), {
+            return new Response(JSON.stringify({ error: 'Missing fileId' } satisfies ApiResponse), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -29,13 +34,13 @@ export async function onRequestPost(context) {
         const data = await env.CONTENT_KV.get(`file:${fileId}`);
         
         if (!data) {
-            return new Response(JSON.stringify({ error: 'File not found' }), {
+            return new Response(JSON.stringify({ error: 'File not found' } satisfies ApiResponse), {
                 status: 404,
                 headers: { 'Content-Type': 'application/json' }
             });
         }
         
-        const metadata = JSON.parse(data);
+        const metadata = JSON.parse(data) as KVFileMetadata;
         
         // Delete from B2 (optional - uncomment if you want to delete from storage too)
         try {
@@ -56,13 +61,13 @@ export async function onRequestPost(context) {
         await env.CONTENT_KV.delete(`file:${fileId}`);
         
         // Update file index
-        let fileIndex = [];
+        let fileIndex: string[] = [];
         try {
             const indexData = await env.CONTENT_KV.get('file_index');
             if (indexData) {
-                fileIndex = JSON.parse(indexData);
+                fileIndex = JSON.parse(indexData) as string[];
             }
-        } catch (e) {
+        } catch {
             // Ignore
         }
         
@@ -73,14 +78,14 @@ export async function onRequestPost(context) {
         return new Response(JSON.stringify({ 
             success: true,
             message: 'File deleted'
-        }), {
+        } satisfies ApiResponse), {
             status: 200,
             headers: { 'Content-Type': 'application/json' }
         });
         
     } catch (err) {
         console.error('Delete error:', err);
-        return new Response(JSON.stringify({ error: 'Failed to delete file' }), {
+        return new Response(JSON.stringify({ error: 'Failed to delete file' } satisfies ApiResponse), {
             status: 500,
             headers: { 'Content-Type': 'application/json' }
         });

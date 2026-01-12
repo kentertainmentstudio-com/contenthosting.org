@@ -5,10 +5,11 @@
  * Deletes a file from both B2 storage and D1 database.
  */
 
-import { verifyAuth } from './_auth-middleware.js';
-import { deleteObject } from './_s3-signer.js';
+import { verifyAuth } from './_auth-middleware';
+import { deleteObject } from './_s3-signer';
+import type { PagesContext, FileMetadata, ApiResponse } from '../types';
 
-export async function onRequestDelete(context) {
+export async function onRequestDelete(context: PagesContext): Promise<Response> {
     const { request, env } = context;
     
     // Verify authentication
@@ -20,17 +21,17 @@ export async function onRequestDelete(context) {
         const fileId = url.searchParams.get('id');
         
         if (!fileId) {
-            return new Response(JSON.stringify({ error: 'File ID required' }), {
+            return new Response(JSON.stringify({ error: 'File ID required' } satisfies ApiResponse), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' }
             });
         }
         
         // Get file metadata from D1
-        const file = await env.DB.prepare('SELECT * FROM files WHERE id = ?').bind(fileId).first();
+        const file = await env.DB.prepare('SELECT * FROM files WHERE id = ?').bind(fileId).first<FileMetadata>();
         
         if (!file) {
-            return new Response(JSON.stringify({ error: 'File not found' }), {
+            return new Response(JSON.stringify({ error: 'File not found' } satisfies ApiResponse), {
                 status: 404,
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -61,14 +62,14 @@ export async function onRequestDelete(context) {
         return new Response(JSON.stringify({
             success: true,
             message: 'File deleted successfully'
-        }), {
+        } satisfies ApiResponse), {
             status: 200,
             headers: { 'Content-Type': 'application/json' }
         });
         
     } catch (err) {
         console.error('Delete error:', err);
-        return new Response(JSON.stringify({ error: 'Failed to delete file' }), {
+        return new Response(JSON.stringify({ error: 'Failed to delete file' } satisfies ApiResponse), {
             status: 500,
             headers: { 'Content-Type': 'application/json' }
         });
@@ -76,6 +77,6 @@ export async function onRequestDelete(context) {
 }
 
 // Also support POST for compatibility
-export async function onRequestPost(context) {
+export async function onRequestPost(context: PagesContext): Promise<Response> {
     return onRequestDelete(context);
 }

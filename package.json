@@ -6,11 +6,16 @@
   "scripts": {
     "dev": "wrangler pages dev public --kv CONTENT_KV --d1 DB",
     "deploy": "wrangler pages deploy public --project-name=contenthosting",
-    "hash-password": "node scripts/hash-password.js",
+    "hash-password": "npx tsx scripts/hash-password.ts",
     "db:init": "wrangler d1 execute contenthosting-db --file=schema.sql",
-    "db:query": "wrangler d1 execute contenthosting-db"
+    "db:query": "wrangler d1 execute contenthosting-db",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240614.0",
+    "@types/node": "^20.11.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
     "wrangler": "^3.0.0"
   },
   "engines": {

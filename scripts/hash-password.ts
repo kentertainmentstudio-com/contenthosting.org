@@ -1,21 +1,21 @@
 /**
  * Password Hashing Utility
  * 
- * Run with: node scripts/hash-password.js
+ * Run with: npx tsx scripts/hash-password.ts
  * Or: npm run hash-password
  * 
  * Enter your password when prompted, get the SHA-256 hash.
  */
 
-const crypto = require('crypto');
-const readline = require('readline');
+import * as crypto from 'crypto';
+import * as readline from 'readline';
 
 const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
 });
 
-rl.question('Enter password to hash: ', (password) => {
+rl.question('Enter password to hash: ', (password: string) => {
     if (!password) {
         console.error('Password cannot be empty');
         rl.close();

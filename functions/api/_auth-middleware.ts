@@ -5,7 +5,9 @@
  * Import this in any endpoint that requires authentication.
  */
 
-export async function verifyAuth(request, env) {
+import type { Env } from '../types';
+
+export async function verifyAuth(request: Request, env: Env): Promise<Response | null> {
     const authHeader = request.headers.get('Authorization');
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {

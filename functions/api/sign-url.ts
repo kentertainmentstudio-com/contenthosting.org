@@ -6,9 +6,16 @@
  * URLs are short-lived (30 minutes) for security.
  */
 
-import { generatePresignedGetUrl } from './_s3-signer.js';
+import { generatePresignedGetUrl } from './_s3-signer';
+import type { PagesContext, KVFileMetadata, ApiResponse } from '../types';
 
-export async function onRequestGet(context) {
+interface SignUrlResponse {
+    url: string;
+    contentType: string;
+    filename: string;
+}
+
+export async function onRequestGet(context: PagesContext): Promise<Response> {
     const { request, env } = context;
     
     try {
@@ -16,7 +23,7 @@ export async function onRequestGet(context) {
         const fileId = url.searchParams.get('fileId');
         
         if (!fileId) {
-            return new Response(JSON.stringify({ error: 'Missing fileId' }), {
+            return new Response(JSON.stringify({ error: 'Missing fileId' } satisfies ApiResponse), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -26,13 +33,13 @@ export async function onRequestGet(context) {
         const data = await env.CONTENT_KV.get(`file:${fileId}`);
         
         if (!data) {
-            return new Response(JSON.stringify({ error: 'File not found' }), {
+            return new Response(JSON.stringify({ error: 'File not found' } satisfies ApiResponse), {
                 status: 404,
                 headers: { 'Content-Type': 'application/json' }
             });
         }
         
-        const metadata = JSON.parse(data);
+        const metadata = JSON.parse(data) as KVFileMetadata;
         
         // Generate signed GET URL (valid for 30 minutes)
         const signedUrl = await generatePresignedGetUrl({
@@ -45,11 +52,13 @@ export async function onRequestGet(context) {
             expiresIn: 1800 // 30 minutes
         });
         
-        return new Response(JSON.stringify({
+        const response: SignUrlResponse = {
             url: signedUrl,
             contentType: metadata.contentType,
             filename: metadata.filename
-        }), {
+        };
+        
+        return new Response(JSON.stringify(response), {
             status: 200,
             headers: { 
                 'Content-Type': 'application/json',
@@ -60,7 +69,7 @@ export async function onRequestGet(context) {
         
     } catch (err) {
         console.error('Sign URL error:', err);
-        return new Response(JSON.stringify({ error: 'Failed to generate signed URL' }), {
+        return new Response(JSON.stringify({ error: 'Failed to generate signed URL' } satisfies ApiResponse), {
             status: 500,
             headers: { 'Content-Type': 'application/json' }
         });
@@ -68,7 +77,7 @@ export async function onRequestGet(context) {
 }
 
 // Handle CORS preflight
-export async function onRequestOptions() {
+export async function onRequestOptions(): Promise<Response> {
     return new Response(null, {
         status: 204,
         headers: {

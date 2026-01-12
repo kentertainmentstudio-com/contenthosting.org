@@ -6,7 +6,9 @@
  * Used by external services to get embed info.
  */
 
-export async function onRequestGet(context) {
+import type { PagesContext, FileMetadata, EmbedUrlResponse, ApiResponse } from '../types';
+
+export async function onRequestGet(context: PagesContext): Promise<Response> {
     const { request, env } = context;
     
     try {
@@ -14,7 +16,7 @@ export async function onRequestGet(context) {
         const fileId = url.searchParams.get('id');
         
         if (!fileId) {
-            return new Response(JSON.stringify({ error: 'File ID required' }), {
+            return new Response(JSON.stringify({ error: 'File ID required' } satisfies ApiResponse), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -23,10 +25,10 @@ export async function onRequestGet(context) {
         // Get file metadata from D1
         const file = await env.DB.prepare(
             'SELECT id, filename, type, size, upload_date, b2_key, thumbnail_url, description FROM files WHERE id = ?'
-        ).bind(fileId).first();
+        ).bind(fileId).first<FileMetadata>();
         
         if (!file) {
-            return new Response(JSON.stringify({ error: 'File not found' }), {
+            return new Response(JSON.stringify({ error: 'File not found' } satisfies ApiResponse), {
                 status: 404,
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -36,7 +38,7 @@ export async function onRequestGet(context) {
         const embedCode = `<iframe src="${embedUrl}" width="100%" height="450" frameborder="0" allowfullscreen></iframe>`;
         const mediaUrl = `${env.B2_PUBLIC_URL}/${file.b2_key}`;
         
-        return new Response(JSON.stringify({
+        const response: EmbedUrlResponse = {
             fileId: file.id,
             filename: file.filename,
             type: file.type,
@@ -47,7 +49,9 @@ export async function onRequestGet(context) {
             embedCode,
             mediaUrl,
             thumbnailUrl: file.thumbnail_url
-        }), {
+        };
+        
+        return new Response(JSON.stringify(response), {
             status: 200,
             headers: { 
                 'Content-Type': 'application/json',
@@ -57,7 +61,7 @@ export async function onRequestGet(context) {
         
     } catch (err) {
         console.error('Get embed URL error:', err);
-        return new Response(JSON.stringify({ error: 'Failed to get embed URL' }), {
+        return new Response(JSON.stringify({ error: 'Failed to get embed URL' } satisfies ApiResponse), {
             status: 500,
             headers: { 'Content-Type': 'application/json' }
         });

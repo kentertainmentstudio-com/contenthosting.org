@@ -10,6 +10,8 @@
  * - DELETE (remove)
  */
 
+import type { PresignedUrlOptions, PresignedPutUrlOptions, SignOptions } from '../types';
+
 /**
  * Generate a presigned PUT URL for uploading
  */
@@ -22,7 +24,7 @@ export async function generatePresignedPutUrl({
     region,
     endpoint,
     expiresIn = 3600
-}) {
+}: PresignedPutUrlOptions): Promise<string> {
     const url = `https://${endpoint}/${bucket}/${key}`;
     return await sign({
         method: 'PUT',
@@ -48,7 +50,7 @@ export async function generatePresignedGetUrl({
     region,
     endpoint,
     expiresIn = 1800
-}) {
+}: PresignedUrlOptions): Promise<string> {
     const url = `https://${endpoint}/${bucket}/${key}`;
     return await sign({
         method: 'GET',
@@ -70,7 +72,7 @@ export async function deleteObject({
     secretAccessKey,
     region,
     endpoint
-}) {
+}: PresignedUrlOptions): Promise<boolean> {
     const url = `https://${endpoint}/${bucket}/${key}`;
     const signedUrl = await sign({
         method: 'DELETE',
@@ -99,8 +101,7 @@ async function sign({
     secretAccessKey,
     region,
     expiresIn,
-    headers = {}
-}) {
+}: SignOptions): Promise<string> {
     const parsedUrl = new URL(url);
     const host = parsedUrl.host;
     const path = parsedUrl.pathname;
@@ -173,7 +174,12 @@ async function sign({
 /**
  * Calculate the signing key
  */
-async function getSignatureKey(key, dateStamp, region, service) {
+async function getSignatureKey(
+    key: string,
+    dateStamp: string,
+    region: string,
+    service: string
+): Promise<ArrayBuffer> {
     const kDate = await hmacSha256(`AWS4${key}`, dateStamp);
     const kRegion = await hmacSha256(kDate, region);
     const kService = await hmacSha256(kRegion, service);
@@ -184,7 +190,7 @@ async function getSignatureKey(key, dateStamp, region, service) {
 /**
  * HMAC-SHA256 returning ArrayBuffer
  */
-async function hmacSha256(key, data) {
+async function hmacSha256(key: string | ArrayBuffer, data: string): Promise<ArrayBuffer> {
     const keyBuffer = typeof key === 'string' 
         ? new TextEncoder().encode(key) 
         : key;
@@ -204,7 +210,7 @@ async function hmacSha256(key, data) {
 /**
  * HMAC-SHA256 returning hex string
  */
-async function hmacSha256Hex(key, data) {
+async function hmacSha256Hex(key: ArrayBuffer, data: string): Promise<string> {
     const result = await hmacSha256(key, data);
     return arrayBufferToHex(result);
 }
@@ -212,7 +218,7 @@ async function hmacSha256Hex(key, data) {
 /**
  * SHA-256 hash returning hex string
  */
-async function sha256Hex(data) {
+async function sha256Hex(data: string): Promise<string> {
     const buffer = new TextEncoder().encode(data);
     const hash = await crypto.subtle.digest('SHA-256', buffer);
     return arrayBufferToHex(hash);
@@ -221,7 +227,7 @@ async function sha256Hex(data) {
 /**
  * Convert ArrayBuffer to hex string
  */
-function arrayBufferToHex(buffer) {
+function arrayBufferToHex(buffer: ArrayBuffer): string {
     return Array.from(new Uint8Array(buffer))
         .map(b => b.toString(16).padStart(2, '0'))
         .join('');

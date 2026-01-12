@@ -5,9 +5,10 @@
  * Returns list of all uploaded files from KV.
  */
 
-import { verifyAuth } from './_auth-middleware.js';
+import { verifyAuth } from './_auth-middleware';
+import type { PagesContext, KVFileMetadata, ApiResponse } from '../types';
 
-export async function onRequestGet(context) {
+export async function onRequestGet(context: PagesContext): Promise<Response> {
     const { request, env } = context;
     
     // Verify authentication
@@ -25,22 +26,22 @@ export async function onRequestGet(context) {
             });
         }
         
-        const fileIndex = JSON.parse(indexData);
+        const fileIndex = JSON.parse(indexData) as string[];
         
         // Fetch metadata for each file
         // Use Promise.all for parallel fetching (much faster)
         const files = await Promise.all(
-            fileIndex.map(async (fileId) => {
+            fileIndex.map(async (fileId): Promise<KVFileMetadata | null> => {
                 const data = await env.CONTENT_KV.get(`file:${fileId}`);
                 if (data) {
-                    return JSON.parse(data);
+                    return JSON.parse(data) as KVFileMetadata;
                 }
                 return null;
             })
         );
         
         // Filter out any null entries (deleted files)
-        const validFiles = files.filter(f => f !== null);
+        const validFiles = files.filter((f): f is KVFileMetadata => f !== null);
         
         return new Response(JSON.stringify(validFiles), {
             status: 200,
@@ -49,7 +50,7 @@ export async function onRequestGet(context) {
         
     } catch (err) {
         console.error('List error:', err);
-        return new Response(JSON.stringify({ error: 'Failed to list files' }), {
+        return new Response(JSON.stringify({ error: 'Failed to list files' } satisfies ApiResponse), {
             status: 500,
             headers: { 'Content-Type': 'application/json' }
         });

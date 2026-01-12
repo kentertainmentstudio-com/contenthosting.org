@@ -1,6 +1,6 @@
 /**
- * Presigned POST URL API Endpoint
- * POST /api/presigned-post
+ * Upload URL API Endpoint
+ * POST /api/upload-url
  * 
  * Generates a presigned URL for direct browser-to-B2 upload.
  * This bypasses Worker body size limits (100MB free tier).
@@ -8,10 +8,17 @@
  * Uses S3-compatible API with AWS Signature V4.
  */
 
-import { verifyAuth } from './_auth-middleware.js';
-import { generatePresignedPutUrl } from './_s3-signer.js';
+import { verifyAuth } from './_auth-middleware';
+import { generatePresignedPutUrl } from './_s3-signer';
+import type { PagesContext, UploadUrlResponse, ApiResponse, ContentTypeMap } from '../types';
 
-export async function onRequestPost(context) {
+interface UploadUrlRequest {
+    filename?: string;
+    contentType?: string;
+    size?: number;
+}
+
+export async function onRequestPost(context: PagesContext): Promise<Response> {
     const { request, env } = context;
     
     // Verify authentication
@@ -19,11 +26,11 @@ export async function onRequestPost(context) {
     if (authError) return authError;
     
     try {
-        const { filename, contentType, size } = await request.json();
+        const { filename, contentType, size } = await request.json() as UploadUrlRequest;
         
         // Validate input
         if (!filename || !contentType) {
-            return new Response(JSON.stringify({ error: 'Missing filename or contentType' }), {
+            return new Response(JSON.stringify({ error: 'Missing filename or contentType' } satisfies ApiResponse), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -32,7 +39,7 @@ export async function onRequestPost(context) {
         // Validate file type
         const allowedTypes = ['video/mp4', 'video/webm', 'image/jpeg', 'image/png', 'image/gif'];
         if (!allowedTypes.includes(contentType)) {
-            return new Response(JSON.stringify({ error: 'Invalid file type' }), {
+            return new Response(JSON.stringify({ error: 'Invalid file type' } satisfies ApiResponse), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -40,8 +47,8 @@ export async function onRequestPost(context) {
         
         // Validate file size (500MB max)
         const maxSize = 500 * 1024 * 1024;
-        if (size > maxSize) {
-            return new Response(JSON.stringify({ error: 'File too large (max 500MB)' }), {
+        if (size && size > maxSize) {
+            return new Response(JSON.stringify({ error: 'File too large (max 500MB)' } satisfies ApiResponse), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -69,18 +76,20 @@ export async function onRequestPost(context) {
             expiresIn: 3600 // 1 hour
         });
         
-        return new Response(JSON.stringify({
+        const response: UploadUrlResponse = {
             uploadUrl,
             fileId,
             b2Key
-        }), {
+        };
+        
+        return new Response(JSON.stringify(response), {
             status: 200,
             headers: { 'Content-Type': 'application/json' }
         });
         
     } catch (err) {
-        console.error('Presigned POST error:', err);
-        return new Response(JSON.stringify({ error: 'Failed to generate upload URL' }), {
+        console.error('Upload URL error:', err);
+        return new Response(JSON.stringify({ error: 'Failed to generate upload URL' } satisfies ApiResponse), {
             status: 500,
             headers: { 'Content-Type': 'application/json' }
         });
@@ -90,13 +99,13 @@ export async function onRequestPost(context) {
 /**
  * Get file extension from filename or content type
  */
-function getExtension(filename, contentType) {
+function getExtension(filename: string, contentType: string): string {
     // Try to get from filename
     const match = filename.match(/\.[a-zA-Z0-9]+$/);
     if (match) return match[0].toLowerCase();
     
     // Fallback to content type
-    const typeMap = {
+    const typeMap: ContentTypeMap = {
         'video/mp4': '.mp4',
         'video/webm': '.webm',
         'image/jpeg': '.jpg',

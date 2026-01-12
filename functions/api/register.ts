@@ -6,9 +6,24 @@
  * Stores file metadata in Workers KV.
  */
 
-import { verifyAuth } from './_auth-middleware.js';
+import { verifyAuth } from './_auth-middleware';
+import type { PagesContext, KVFileMetadata, ApiResponse } from '../types';
 
-export async function onRequestPost(context) {
+interface RegisterRequest {
+    fileId?: string;
+    filename?: string;
+    contentType?: string;
+    size?: number;
+    b2Key?: string;
+}
+
+interface RegisterResponse {
+    success: boolean;
+    fileId: string;
+    metadata: KVFileMetadata;
+}
+
+export async function onRequestPost(context: PagesContext): Promise<Response> {
     const { request, env } = context;
     
     // Verify authentication
@@ -16,18 +31,18 @@ export async function onRequestPost(context) {
     if (authError) return authError;
     
     try {
-        const { fileId, filename, contentType, size, b2Key } = await request.json();
+        const { fileId, filename, contentType, size, b2Key } = await request.json() as RegisterRequest;
         
         // Validate input
         if (!fileId || !filename || !contentType || !b2Key) {
-            return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+            return new Response(JSON.stringify({ error: 'Missing required fields' } satisfies ApiResponse), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' }
             });
         }
         
         // Create metadata object
-        const metadata = {
+        const metadata: KVFileMetadata = {
             fileId,
             filename,
             contentType,
@@ -42,13 +57,13 @@ export async function onRequestPost(context) {
         
         // Also add to the index list for easy listing
         // We'll store a simple index of all file IDs
-        let fileIndex = [];
+        let fileIndex: string[] = [];
         try {
             const indexData = await env.CONTENT_KV.get('file_index');
             if (indexData) {
-                fileIndex = JSON.parse(indexData);
+                fileIndex = JSON.parse(indexData) as string[];
             }
-        } catch (e) {
+        } catch {
             // Index doesn't exist yet, start fresh
         }
         
@@ -62,18 +77,20 @@ export async function onRequestPost(context) {
         
         await env.CONTENT_KV.put('file_index', JSON.stringify(fileIndex));
         
-        return new Response(JSON.stringify({ 
+        const response: RegisterResponse = {
             success: true,
             fileId,
             metadata
-        }), {
+        };
+        
+        return new Response(JSON.stringify(response), {
             status: 200,
             headers: { 'Content-Type': 'application/json' }
         });
         
     } catch (err) {
         console.error('Register error:', err);
-        return new Response(JSON.stringify({ error: 'Failed to register file' }), {
+        return new Response(JSON.stringify({ error: 'Failed to register file' } satisfies ApiResponse), {
             status: 500,
             headers: { 'Content-Type': 'application/json' }
         });

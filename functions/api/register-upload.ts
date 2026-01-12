@@ -5,9 +5,26 @@
  * Saves file metadata to D1 database after successful B2 upload.
  */
 
-import { verifyAuth } from './_auth-middleware.js';
+import { verifyAuth } from './_auth-middleware';
+import type { PagesContext, ApiResponse } from '../types';
 
-export async function onRequestPost(context) {
+interface RegisterUploadRequest {
+    fileId?: string;
+    filename?: string;
+    contentType?: string;
+    size?: number;
+    b2Key?: string;
+    description?: string;
+}
+
+interface RegisterUploadResponse {
+    success: boolean;
+    fileId: string;
+    filename: string;
+    uploadDate: string;
+}
+
+export async function onRequestPost(context: PagesContext): Promise<Response> {
     const { request, env } = context;
     
     // Verify authentication
@@ -15,18 +32,18 @@ export async function onRequestPost(context) {
     if (authError) return authError;
     
     try {
-        const { fileId, filename, contentType, size, b2Key, description } = await request.json();
+        const { fileId, filename, contentType, size, b2Key, description } = await request.json() as RegisterUploadRequest;
         
         // Validate required fields
         if (!fileId || !filename || !contentType || !b2Key) {
-            return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+            return new Response(JSON.stringify({ error: 'Missing required fields' } satisfies ApiResponse), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' }
             });
         }
         
         // Generate thumbnail URL (for images, use the image itself; for videos, use placeholder)
-        let thumbnailUrl = null;
+        let thumbnailUrl: string | null = null;
         if (contentType.startsWith('image/')) {
             thumbnailUrl = `${env.B2_PUBLIC_URL}/${b2Key}`;
         }
@@ -53,19 +70,21 @@ export async function onRequestPost(context) {
             throw new Error('Database insert failed');
         }
         
-        return new Response(JSON.stringify({
+        const response: RegisterUploadResponse = {
             success: true,
             fileId,
             filename,
             uploadDate
-        }), {
+        };
+        
+        return new Response(JSON.stringify(response), {
             status: 200,
             headers: { 'Content-Type': 'application/json' }
         });
         
     } catch (err) {
         console.error('Register upload error:', err);
-        return new Response(JSON.stringify({ error: 'Failed to register file' }), {
+        return new Response(JSON.stringify({ error: 'Failed to register file' } satisfies ApiResponse), {
             status: 500,
             headers: { 'Content-Type': 'application/json' }
         });

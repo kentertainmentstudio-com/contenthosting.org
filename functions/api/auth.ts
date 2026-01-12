@@ -6,14 +6,20 @@
  * Uses SHA-256 hash comparison for simplicity.
  */
 
-export async function onRequestPost(context) {
+import type { PagesContext, AuthResponse } from '../types';
+
+interface AuthRequest {
+    password?: string;
+}
+
+export async function onRequestPost(context: PagesContext): Promise<Response> {
     const { request, env } = context;
     
     try {
-        const { password } = await request.json();
+        const { password } = await request.json() as AuthRequest;
         
         if (!password) {
-            return new Response(JSON.stringify({ error: 'Password required' }), {
+            return new Response(JSON.stringify({ error: 'Password required' } satisfies AuthResponse), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -31,14 +37,14 @@ export async function onRequestPost(context) {
         
         if (!storedHash) {
             console.error('ADMIN_PASSWORD_HASH not configured');
-            return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+            return new Response(JSON.stringify({ error: 'Server configuration error' } satisfies AuthResponse), {
                 status: 500,
                 headers: { 'Content-Type': 'application/json' }
             });
         }
         
         if (hashHex !== storedHash.toLowerCase()) {
-            return new Response(JSON.stringify({ error: 'Invalid password' }), {
+            return new Response(JSON.stringify({ error: 'Invalid password' } satisfies AuthResponse), {
                 status: 401,
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -56,14 +62,14 @@ export async function onRequestPost(context) {
         return new Response(JSON.stringify({ 
             success: true,
             token 
-        }), {
+        } satisfies AuthResponse), {
             status: 200,
             headers: { 'Content-Type': 'application/json' }
         });
         
     } catch (err) {
         console.error('Auth error:', err);
-        return new Response(JSON.stringify({ error: 'Authentication failed' }), {
+        return new Response(JSON.stringify({ error: 'Authentication failed' } satisfies AuthResponse), {
             status: 500,
             headers: { 'Content-Type': 'application/json' }
         });
@@ -73,7 +79,7 @@ export async function onRequestPost(context) {
 /**
  * Generate a random token
  */
-function generateToken() {
+function generateToken(): string {
     const array = new Uint8Array(32);
     crypto.getRandomValues(array);
     return Array.from(array, b => b.toString(16).padStart(2, '0')).join('');
