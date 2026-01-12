@@ -75,10 +75,10 @@
         /* Web3 Background */
         .web3-bg {
             background: 
-                radial-gradient(ellipse at 20% 20%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
-                radial-gradient(ellipse at 80% 80%, rgba(236, 72, 153, 0.08) 0%, transparent 50%),
-                radial-gradient(ellipse at 50% 50%, rgba(0, 240, 255, 0.04) 0%, transparent 70%),
-                linear-gradient(180deg, #050508 0%, #0a0a0f 100%);
+                radial-gradient(ellipse at 20% 20%, rgba(139, 92, 246, 0.06) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(236, 72, 153, 0.04) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(0, 240, 255, 0.02) 0%, transparent 70%),
+                linear-gradient(180deg, #0c0c14 0%, #12121c 100%);
         }
 
         /* Grid pattern overlay */
@@ -91,10 +91,11 @@
 
         /* Glassmorphism */
         .glass-card {
-            background: rgba(15, 15, 25, 0.7);
+            background: rgba(20, 20, 35, 0.85);
             backdrop-filter: blur(20px);
-            border: 1px solid rgba(139, 92, 246, 0.2);
+            border: 1px solid rgba(139, 92, 246, 0.25);
             border-radius: 16px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
         }
 
         .glass-card:hover {
@@ -103,11 +104,11 @@
 
         /* Neon glow */
         .neon-glow {
-            box-shadow: 0 0 20px rgba(0, 240, 255, 0.3), 0 0 40px rgba(139, 92, 246, 0.2);
+            box-shadow: 0 0 12px rgba(0, 240, 255, 0.2), 0 0 25px rgba(139, 92, 246, 0.15);
         }
 
         .neon-glow-purple {
-            box-shadow: 0 0 20px rgba(139, 92, 246, 0.4), 0 0 40px rgba(139, 92, 246, 0.2);
+            box-shadow: 0 0 12px rgba(139, 92, 246, 0.3), 0 0 25px rgba(139, 92, 246, 0.15);
         }
 
         /* Gradient text */
@@ -372,20 +373,21 @@
 
         /* Card styles */
         .card {
-            background: rgba(15, 15, 25, 0.7);
+            background: rgba(22, 22, 38, 0.8);
             backdrop-filter: blur(20px);
-            border: 1px solid rgba(139, 92, 246, 0.2);
+            border: 1px solid rgba(139, 92, 246, 0.22);
             border-radius: 1rem;
             padding: 1.5rem;
+            box-shadow: 0 4px 25px rgba(0, 0, 0, 0.25);
         }
 
         .dark .card {
-            background: rgba(10, 10, 15, 0.8);
-            border-color: rgba(139, 92, 246, 0.15);
+            background: rgba(18, 18, 30, 0.85);
+            border-color: rgba(139, 92, 246, 0.18);
         }
 
         .card:hover {
-            border-color: rgba(139, 92, 246, 0.3);
+            border-color: rgba(139, 92, 246, 0.35);
         }
 
         /* Badge styles */
@@ -447,27 +449,28 @@
         .orb {
             position: fixed;
             border-radius: 50%;
-            filter: blur(80px);
+            filter: blur(100px);
             pointer-events: none;
             z-index: -1;
+            opacity: 0.5;
         }
 
         .orb-1 {
-            width: 400px;
-            height: 400px;
-            background: radial-gradient(circle, rgba(139, 92, 246, 0.3) 0%, transparent 70%);
+            width: 350px;
+            height: 350px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.2) 0%, transparent 70%);
             top: 10%;
             left: 10%;
-            animation: float 8s ease-in-out infinite;
+            animation: float 12s ease-in-out infinite;
         }
 
         .orb-2 {
-            width: 300px;
-            height: 300px;
-            background: radial-gradient(circle, rgba(0, 240, 255, 0.2) 0%, transparent 70%);
+            width: 280px;
+            height: 280px;
+            background: radial-gradient(circle, rgba(0, 240, 255, 0.15) 0%, transparent 70%);
             bottom: 20%;
             right: 10%;
-            animation: float 8s ease-in-out infinite 2s;
+            animation: float 12s ease-in-out infinite 2s;
         }
 
         @keyframes float {
