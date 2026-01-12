@@ -581,7 +581,8 @@
                 
             } catch (err) {
                 console.error('Upload error:', err);
-                showToast('Upload failed: ' + err.message, 'error');
+                const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+                showToast('Upload failed: ' + errorMsg, 'error');
                 progressContainer.classList.add('hidden');
             } finally {
                 uploadBtn.disabled = !selectedFile;
@@ -608,11 +609,16 @@
                     if (xhr.status >= 200 && xhr.status < 300) {
                         resolve(xhr.response);
                     } else {
-                        reject(new Error(`Upload failed with status ${xhr.status}`));
+                        console.error('Upload response:', xhr.status, xhr.responseText);
+                        reject(new Error(`Upload failed with status ${xhr.status}: ${xhr.responseText}`));
                     }
                 });
                 
-                xhr.addEventListener('error', () => reject(new Error('Upload failed')));
+                xhr.addEventListener('error', (e) => {
+                    console.error('XHR error:', e);
+                    reject(new Error('Upload failed: Network error'));
+                });
+                
                 xhr.addEventListener('abort', () => reject(new Error('Upload aborted')));
                 
                 xhr.open('PUT', url);

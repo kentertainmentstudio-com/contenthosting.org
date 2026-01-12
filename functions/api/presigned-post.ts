@@ -36,9 +36,16 @@ export async function onRequestPost(context: PagesContext): Promise<Response> {
             });
         }
         
-        // Validate file type
-        const allowedTypes = ['video/mp4', 'video/webm', 'image/jpeg', 'image/png', 'image/gif'];
-        if (!allowedTypes.includes(contentType)) {
+        // Validate file type (support common MIME type variations)
+        const isValidType = 
+            contentType === 'video/mp4' ||
+            contentType === 'video/webm' ||
+            contentType === 'image/jpeg' ||
+            contentType.startsWith('image/png') ||
+            contentType === 'image/gif' ||
+            contentType === 'image/x-png'; // Support alternate PNG MIME type
+        
+        if (!isValidType) {
             return new Response(JSON.stringify({ error: 'Invalid file type' } satisfies ApiResponse), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' }
@@ -91,8 +98,9 @@ export async function onRequestPost(context: PagesContext): Promise<Response> {
         });
         
     } catch (err) {
-        console.error('Presigned POST error:', err);
-        return new Response(JSON.stringify({ error: 'Failed to generate upload URL' } satisfies ApiResponse), {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        console.error('Presigned POST error:', errorMsg, err);
+        return new Response(JSON.stringify({ error: `Failed to generate upload URL: ${errorMsg}` } satisfies ApiResponse), {
             status: 500,
             headers: { 'Content-Type': 'application/json' }
         });
@@ -107,7 +115,8 @@ function getExtension(filename: string, contentType: string): string {
     const match = filename.match(/\.[a-zA-Z0-9]+$/);
     if (match) return match[0].toLowerCase();
     
-    // Fallback to content type
+    // Fallback to content type (normalize PNG MIME type variants)
+    const normalizedType = contentType === 'image/x-png' ? 'image/png' : contentType;
     const typeMap: ContentTypeMap = {
         'video/mp4': '.mp4',
         'video/webm': '.webm',
@@ -116,7 +125,7 @@ function getExtension(filename: string, contentType: string): string {
         'image/gif': '.gif'
     };
     
-    return typeMap[contentType] || '';
+    return typeMap[normalizedType] || '';
 }
 
 // Handle CORS preflight
