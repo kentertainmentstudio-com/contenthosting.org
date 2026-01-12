@@ -107,13 +107,6 @@ async function sign({
     const parsedUrl = new URL(url);
     const host = parsedUrl.host;
     
-    // For S3 Signature V4, the path must be URI-encoded in a specific way:
-    // - Each path segment is encoded separately
-    // - '/' is NOT encoded
-    // - Use the SAME encoded path for both signing AND the final URL
-    const pathSegments = parsedUrl.pathname.split('/');
-    const encodedPath = pathSegments.map(segment => s3UriEncode(segment)).join('/');
-    
     // Current time
     const now = new Date();
     const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
@@ -125,12 +118,15 @@ async function sign({
     // Credential scope
     const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
     
-    // Build canonical headers - always include host
-    const signedHeaders = 'host';
-    const canonicalHeaders = `host:${host}\n`;
+    // Canonical URI (path) - must be properly encoded
+    const canonicalUri = encodePath(parsedUrl.pathname);
     
-    // Build query parameters for signing (must be sorted alphabetically)
-    const queryParamsToSign: Record<string, string> = {
+    // Build canonical headers - host must be lowercase
+    const canonicalHeaders = `host:${host.toLowerCase()}\n`;
+    const signedHeaders = 'host';
+    
+    // Query parameters for presigned URL
+    const params = {
         'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
         'X-Amz-Credential': `${accessKeyId}/${credentialScope}`,
         'X-Amz-Date': amzDate,
@@ -138,19 +134,19 @@ async function sign({
         'X-Amz-SignedHeaders': signedHeaders
     };
     
-    // Create canonical query string (sorted, properly encoded)
-    const canonicalQueryString = Object.keys(queryParamsToSign)
+    // Create canonical query string (sorted keys)
+    const canonicalQueryString = Object.keys(params)
         .sort()
-        .map(key => `${s3UriEncode(key)}=${s3UriEncode(queryParamsToSign[key])}`)
+        .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key as keyof typeof params])}`)
         .join('&');
     
-    // For presigned URLs, payload is always UNSIGNED-PAYLOAD
+    // Payload for presigned URLs is always UNSIGNED-PAYLOAD
     const hashedPayload = 'UNSIGNED-PAYLOAD';
     
     // Create canonical request
     const canonicalRequest = [
         method,
-        encodedPath,
+        canonicalUri,
         canonicalQueryString,
         canonicalHeaders,
         signedHeaders,
@@ -174,17 +170,28 @@ async function sign({
     // Calculate signature
     const signature = await hmacSha256Hex(signingKey, stringToSign);
     
-    // Build final URL with all query params including signature
-    const finalQueryString = canonicalQueryString + '&X-Amz-Signature=' + signature;
+    // Build final URL
+    const finalQueryString = canonicalQueryString + '&X-Amz-Signature=' + encodeURIComponent(signature);
     
-    return `${parsedUrl.origin}${encodedPath}?${finalQueryString}`;
+    return `${parsedUrl.protocol}//${host}${canonicalUri}?${finalQueryString}`;
 }
 
 /**
- * S3-specific URI encoding
- * AWS requires a specific encoding that differs from standard encodeURIComponent:
- * - Unreserved characters (A-Z, a-z, 0-9, -, _, ., ~) are NOT encoded
- * - Everything else is percent-encoded
+ * Encode path according to AWS requirements
+ */
+function encodePath(path: string): string {
+    return path.split('/').map(segment => {
+        // Don't encode if it's empty (leading slash)
+        if (!segment) return segment;
+        
+        // AWS-style encoding: encode everything except unreserved characters
+        return encodeURIComponent(segment)
+            .replace(/[!'()*]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+    }).join('/');
+}
+
+/**
+ * S3-specific URI encoding - DEPRECATED, using standard encoding above
  */
 function s3UriEncode(str: string): string {
     if (!str) return str;
