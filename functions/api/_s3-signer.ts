@@ -125,23 +125,24 @@ async function sign({
     // Credential scope
     const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
     
-    // Build canonical headers - always include host, optionally include others
-    // For presigned URLs, we only sign the host header
+    // Build canonical headers - always include host
     const signedHeaders = 'host';
     const canonicalHeaders = `host:${host}\n`;
     
-    // Query parameters for presigned URL
-    const queryParams = new URLSearchParams({
+    // Build query parameters for signing (must be sorted alphabetically)
+    const queryParamsToSign: Record<string, string> = {
         'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
         'X-Amz-Credential': `${accessKeyId}/${credentialScope}`,
         'X-Amz-Date': amzDate,
         'X-Amz-Expires': expiresIn.toString(),
         'X-Amz-SignedHeaders': signedHeaders
-    });
+    };
     
-    // Sort query parameters
-    queryParams.sort();
-    const canonicalQueryString = queryParams.toString();
+    // Create canonical query string (sorted, properly encoded)
+    const canonicalQueryString = Object.keys(queryParamsToSign)
+        .sort()
+        .map(key => `${s3UriEncode(key)}=${s3UriEncode(queryParamsToSign[key])}`)
+        .join('&');
     
     // For presigned URLs, payload is always UNSIGNED-PAYLOAD
     const hashedPayload = 'UNSIGNED-PAYLOAD';
@@ -173,11 +174,10 @@ async function sign({
     // Calculate signature
     const signature = await hmacSha256Hex(signingKey, stringToSign);
     
-    // Add signature to query parameters
-    queryParams.set('X-Amz-Signature', signature);
+    // Build final URL with all query params including signature
+    const finalQueryString = canonicalQueryString + '&X-Amz-Signature=' + signature;
     
-    // Build final URL - MUST use the same encoded path that was used for signing
-    return `${parsedUrl.origin}${encodedPath}?${queryParams.toString()}`;
+    return `${parsedUrl.origin}${encodedPath}?${finalQueryString}`;
 }
 
 /**
