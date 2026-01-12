@@ -101,10 +101,14 @@ async function sign({
     secretAccessKey,
     region,
     expiresIn,
+    // headers parameter kept for API compatibility (future use for signed headers)
+    headers: _headers = {}
 }: SignOptions): Promise<string> {
     const parsedUrl = new URL(url);
     const host = parsedUrl.host;
-    const path = parsedUrl.pathname;
+    // URL-encode the path segments properly for S3
+    const pathSegments = parsedUrl.pathname.split('/');
+    const encodedPath = pathSegments.map(segment => encodeURIComponent(segment)).join('/');
     
     // Current time
     const now = new Date();
@@ -117,7 +121,9 @@ async function sign({
     // Credential scope
     const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
     
-    // Canonical headers - for presigned URLs, we only need host
+    // Build canonical headers - always include host, optionally include others
+    // For presigned URLs, we only sign the host header
+    // Content-Type will be matched when the actual request is made
     const signedHeaders = 'host';
     const canonicalHeaders = `host:${host}\n`;
     
@@ -140,7 +146,7 @@ async function sign({
     // Create canonical request
     const canonicalRequest = [
         method,
-        path,
+        encodedPath,
         canonicalQueryString,
         canonicalHeaders,
         signedHeaders,
@@ -167,8 +173,9 @@ async function sign({
     // Add signature to query parameters
     queryParams.set('X-Amz-Signature', signature);
     
-    // Build final URL
-    return `${parsedUrl.origin}${path}?${queryParams.toString()}`;
+    // Build final URL - use the original pathname (not encoded) for the final URL
+    // because the browser will encode it again when making the request
+    return `${parsedUrl.origin}${parsedUrl.pathname}?${queryParams.toString()}`;
 }
 
 /**

@@ -36,9 +36,16 @@ export async function onRequestPost(context: PagesContext): Promise<Response> {
             });
         }
         
-        // Validate file type
-        const allowedTypes = ['video/mp4', 'video/webm', 'image/jpeg', 'image/png', 'image/gif'];
-        if (!allowedTypes.includes(contentType)) {
+        // Validate file type (support common MIME type variations)
+        const isValidType = 
+            contentType === 'video/mp4' ||
+            contentType === 'video/webm' ||
+            contentType === 'image/jpeg' ||
+            contentType.startsWith('image/png') ||
+            contentType === 'image/gif' ||
+            contentType === 'image/x-png'; // Support alternate PNG MIME type
+        
+        if (!isValidType) {
             return new Response(JSON.stringify({ error: 'Invalid file type' } satisfies ApiResponse), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' }
