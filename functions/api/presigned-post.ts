@@ -84,7 +84,10 @@ export async function onRequestPost(context: PagesContext): Promise<Response> {
         
         return new Response(JSON.stringify(response), {
             status: 200,
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            }
         });
         
     } catch (err) {
@@ -114,4 +117,16 @@ function getExtension(filename: string, contentType: string): string {
     };
     
     return typeMap[contentType] || '';
+}
+
+// Handle CORS preflight
+export async function onRequestOptions(): Promise<Response> {
+    return new Response(null, {
+        status: 204,
+        headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+        }
+    });
 }

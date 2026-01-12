@@ -84,7 +84,10 @@ export async function onRequestPost(context: PagesContext): Promise<Response> {
         
         return new Response(JSON.stringify(response), {
             status: 200,
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            }
         });
         
     } catch (err) {

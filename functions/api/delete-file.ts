@@ -64,7 +64,10 @@ export async function onRequestDelete(context: PagesContext): Promise<Response> 
             message: 'File deleted successfully'
         } satisfies ApiResponse), {
             status: 200,
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            }
         });
         
     } catch (err) {
@@ -79,4 +82,16 @@ export async function onRequestDelete(context: PagesContext): Promise<Response> 
 // Also support POST for compatibility
 export async function onRequestPost(context: PagesContext): Promise<Response> {
     return onRequestDelete(context);
+}
+
+// Handle CORS preflight
+export async function onRequestOptions(): Promise<Response> {
+    return new Response(null, {
+        status: 204,
+        headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'DELETE, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+        }
+    });
 }
