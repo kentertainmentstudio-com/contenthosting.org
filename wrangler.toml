@@ -31,7 +31,7 @@ database_id = "f7c6fb7f-712c-4512-a7e6-1bbbd46a2b97"
 
 [[kv_namespaces]]
 binding = "CONTENT_KV"
-id = "aac68ce65b284507a14b5106317375c2"
+id = "0f50e6ce307a4beb89d396c7e327c988"
 
 # ============================================
 # Environment Variables (Non-Secret)
