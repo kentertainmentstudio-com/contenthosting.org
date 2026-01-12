@@ -1,10 +1,11 @@
 /**
- * S3-Compatible Presigned URL Generator
+ * S3-Compatible Presigned URL Generator using aws4 library
  * 
- * Implements AWS Signature Version 4 for Backblaze B2's S3-compatible API.
- * Custom lightweight implementation compatible with Cloudflare Workers.
+ * Uses the lightweight aws4 package for AWS Signature Version 4
+ * Compatible with Cloudflare Workers and Backblaze B2's S3-compatible API.
  */
 
+import aws4 from 'aws4';
 import type { PresignedUrlOptions, PresignedPutUrlOptions } from '../types';
 
 /**
@@ -20,7 +21,7 @@ export async function generatePresignedPutUrl({
     endpoint,
     expiresIn = 3600
 }: PresignedPutUrlOptions): Promise<string> {
-    return await generatePresignedUrl({
+    return generatePresignedUrl({
         method: 'PUT',
         bucket,
         key,
@@ -28,7 +29,8 @@ export async function generatePresignedPutUrl({
         secretAccessKey,
         region,
         endpoint,
-        expiresIn
+        expiresIn,
+        contentType
     });
 }
 
@@ -44,7 +46,7 @@ export async function generatePresignedGetUrl({
     endpoint,
     expiresIn = 1800
 }: PresignedUrlOptions): Promise<string> {
-    return await generatePresignedUrl({
+    return generatePresignedUrl({
         method: 'GET',
         bucket,
         key,
@@ -67,7 +69,7 @@ export async function deleteObject({
     region,
     endpoint
 }: PresignedUrlOptions): Promise<boolean> {
-    const url = await generatePresignedUrl({
+    const url = generatePresignedUrl({
         method: 'DELETE',
         bucket,
         key,
@@ -83,9 +85,9 @@ export async function deleteObject({
 }
 
 /**
- * Core presigned URL generator
+ * Core presigned URL generator using aws4
  */
-async function generatePresignedUrl({
+function generatePresignedUrl({
     method,
     bucket,
     key,
@@ -93,7 +95,8 @@ async function generatePresignedUrl({
     secretAccessKey,
     region,
     endpoint,
-    expiresIn
+    expiresIn,
+    contentType
 }: {
     method: 'GET' | 'PUT' | 'DELETE';
     bucket: string;
@@ -103,99 +106,34 @@ async function generatePresignedUrl({
     region: string;
     endpoint: string;
     expiresIn: number;
-}): Promise<string> {
+    contentType?: string;
+}): string {
     
-    const host = endpoint;
     const path = `/${bucket}/${key}`;
     
-    // Current timestamp
-    const now = new Date();
-    const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
-    const dateStamp = amzDate.substring(0, 8);
-    
-    const service = 's3';
-    const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
-    
-    // Query parameters (must be in alphabetical order)
-    const params: Record<string, string> = {
-        'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
-        'X-Amz-Credential': `${accessKeyId}/${credentialScope}`,
-        'X-Amz-Date': amzDate,
-        'X-Amz-Expires': expiresIn.toString(),
-        'X-Amz-SignedHeaders': 'host'
+    // Build request options for aws4
+    const opts: any = {
+        host: endpoint,
+        path: path,
+        method: method,
+        region: region,
+        service: 's3',
+        signQuery: true, // Generate presigned URL with signature in query string
+        headers: {
+            'Host': endpoint
+        }
     };
     
-    // Build canonical query string
-    const canonicalQueryString = Object.keys(params)
-        .sort()
-        .map(k => `${encodeURIComponent(k)}=${encodeURIComponent(params[k])}`)
-        .join('&');
-    
-    // Build canonical request
-    const canonicalRequest = [
-        method,
-        path,
-        canonicalQueryString,
-        `host:${host}\n`,
-        'host',
-        'UNSIGNED-PAYLOAD'
-    ].join('\n');
-    
-    // String to sign
-    const stringToSign = [
-        'AWS4-HMAC-SHA256',
-        amzDate,
-        credentialScope,
-        await sha256(canonicalRequest)
-    ].join('\n');
-    
-    // Calculate signature
-    const signingKey = await getSigningKey(secretAccessKey, dateStamp, region, service);
-    const signature = await hmac(signingKey, stringToSign);
-    
-    // Return final URL
-    return `https://${host}${path}?${canonicalQueryString}&X-Amz-Signature=${signature}`;
-}
-
-/**
- * Get signing key
- */
-async function getSigningKey(key: string, dateStamp: string, region: string, service: string): Promise<ArrayBuffer> {
-    const kDate = await hmac(`AWS4${key}`, dateStamp);
-    const kRegion = await hmac(kDate, region);
-    const kService = await hmac(kRegion, service);
-    return await hmac(kService, 'aws4_request');
-}
-
-/**
- * HMAC-SHA256
- */
-async function hmac(key: string | ArrayBuffer, data: string): Promise<string | ArrayBuffer> {
-    const keyData = typeof key === 'string' ? new TextEncoder().encode(key) : key;
-    const cryptoKey = await crypto.subtle.importKey(
-        'raw',
-        keyData,
-        { name: 'HMAC', hash: 'SHA-256' },
-        false,
-        ['sign']
-    );
-    const signature = await crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(data));
-    
-    // Return hex string for final signature, ArrayBuffer for intermediate keys
-    if (typeof key === 'string' && key.startsWith('AWS4')) {
-        return signature; // Intermediate key
+    if (contentType) {
+        opts.headers['Content-Type'] = contentType;
     }
-    return Array.from(new Uint8Array(signature))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
-}
-
-/**
- * SHA-256 hash
- */
-async function sha256(data: string): Promise<string> {
-    const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(data));
-    return Array.from(new Uint8Array(hash))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
+    
+    // Sign the request using aws4
+    const signed = aws4.sign(opts, {
+        accessKeyId: accessKeyId,
+        secretAccessKey: secretAccessKey
+    });
+    
+    // Build the presigned URL from the signed request
+    return `https://${endpoint}${signed.path}`;
 }
