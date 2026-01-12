@@ -124,16 +124,6 @@ export interface PresignedPutUrlOptions extends PresignedUrlOptions {
     contentType: string;
 }
 
-export interface SignOptions {
-    method: 'GET' | 'PUT' | 'DELETE';
-    url: string;
-    accessKeyId: string;
-    secretAccessKey: string;
-    region: string;
-    expiresIn: number;
-    headers?: Record<string, string>;
-}
-
 // Content type mapping
 export type ContentTypeMap = {
     [key: string]: string;
