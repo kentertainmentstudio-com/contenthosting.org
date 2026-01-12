@@ -4,8 +4,7 @@
 # Update the D1 database ID and KV namespace ID before deploying.
 
 name = "contenthosting"
-compatibility_date = "2024-09-23"
-compatibility_flags = ["nodejs_compat"]
+compatibility_date = "2024-01-01"
 
 # Pages configuration
 pages_build_output_dir = "public"
