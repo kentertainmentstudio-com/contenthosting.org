@@ -12,9 +12,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3.14.1
+      - name: Cloudflare Pages GitHub Action
+        uses: cloudflare/pages-action@v1.5.0
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy public --project-name=contenthosting
+          projectName: contenthosting
+          directory: public
+          branch: main
