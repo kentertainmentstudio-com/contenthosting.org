@@ -21,7 +21,7 @@ pages_build_output_dir = "public"
 [[d1_databases]]
 binding = "DB"
 database_name = "contenthosting-db"
-database_id = "YOUR_D1_DATABASE_ID_HERE"
+database_id = "f7c6fb7f-712c-4512-a7e6-1bbbd46a2b97"
 
 # ============================================
 # KV Namespace Binding (Sessions Only)
@@ -31,8 +31,8 @@ database_id = "YOUR_D1_DATABASE_ID_HERE"
 
 [[kv_namespaces]]
 binding = "CONTENT_KV"
-id = "local-kv"
-preview_id = "local-kv"
+id = "aac68ce65b284507a14b5106317375c2"
+preview_id = "aac68ce65b284507a14b5106317375c2"
 
 # ============================================
 # Environment Variables (Non-Secret)
