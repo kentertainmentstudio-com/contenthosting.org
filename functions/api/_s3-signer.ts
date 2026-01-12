@@ -111,22 +111,45 @@ function generatePresignedUrl({
     
     const path = `/${bucket}/${key}`;
     
-    // Build request options for aws4
+    // Get current timestamp in ISO format
+    const now = new Date();
+    const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
+    const dateStamp = amzDate.substring(0, 8);
+    
+    // Build credential scope
+    const credentialScope = `${dateStamp}/${region}/s3/aws4_request`;
+    const credential = `${accessKeyId}/${credentialScope}`;
+    
+    // Build query parameters for presigned URL
+    const queryParams: Record<string, string> = {
+        'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
+        'X-Amz-Credential': credential,
+        'X-Amz-Date': amzDate,
+        'X-Amz-Expires': expiresIn.toString(),
+        'X-Amz-SignedHeaders': 'host'
+    };
+    
+    // Sort and encode query parameters
+    const sortedKeys = Object.keys(queryParams).sort();
+    const queryString = sortedKeys
+        .map(k => `${encodeURIComponent(k)}=${encodeURIComponent(queryParams[k])}`)
+        .join('&');
+    
+    // Build the URL with query parameters to sign
+    const urlToSign = `${path}?${queryString}`;
+    
+    // Build request options for aws4 signing
     const opts: any = {
         host: endpoint,
-        path: path,
+        path: urlToSign,
         method: method,
         region: region,
         service: 's3',
-        signQuery: true, // Generate presigned URL with signature in query string
         headers: {
             'Host': endpoint
-        }
+        },
+        signQuery: true
     };
-    
-    if (contentType) {
-        opts.headers['Content-Type'] = contentType;
-    }
     
     // Sign the request using aws4
     const signed = aws4.sign(opts, {
